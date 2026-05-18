@@ -1,0 +1,22 @@
+{
+  "name": "baari",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WhatsApp-native salon SaaS for Pakistan",
+  "packageManager": "pnpm@9.0.0",
+  "engines": { "node": ">=20.0.0", "pnpm": ">=9.0.0" },
+  "scripts": {
+    "dev": "concurrently --names web,api --prefix-colors cyan,yellow \"pnpm --filter @baari/web dev\" \"pnpm --filter @baari/api dev\"",
+    "build": "pnpm --filter @baari/db build && pnpm --filter @baari/types build && pnpm --filter @baari/web build && pnpm --filter @baari/api build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @baari/db db:generate",
+    "db:migrate": "pnpm --filter @baari/db db:migrate",
+    "db:seed": "pnpm --filter @baari/db db:seed",
+    "db:studio": "pnpm --filter @baari/db db:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  }
+}

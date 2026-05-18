@@ -1,0 +1,35 @@
+# Baari — Caddyfile
+# Caddy auto-obtains and renews Let's Encrypt certs (3 lines vs Nginx + certbot + cron).
+# Replace baari.pk with your actual domain.
+
+# Dashboard app
+app.baari.pk {
+  reverse_proxy web:3000
+  encode gzip
+}
+
+# Public booking pages — each salon gets /[slug]
+book.baari.pk {
+  reverse_proxy web:3000
+  encode gzip
+}
+
+# API
+api.baari.pk {
+  reverse_proxy api:3001
+
+  # WhatsApp webhook — higher rate limit
+  @webhook path /webhooks/*
+  route @webhook {
+    # Meta sends webhooks in bursts — be generous
+    reverse_proxy api:3001
+  }
+
+  encode gzip
+}
+
+# Local development (no TLS)
+# Uncomment for local Docker Compose without a domain:
+# :80 {
+#   reverse_proxy web:3000
+# }

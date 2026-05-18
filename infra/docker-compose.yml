@@ -1,0 +1,105 @@
+version: '3.9'
+
+# ============================================================
+# Baari — Docker Compose
+# Local dev: docker compose up -d
+# Production on DO Droplet: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: baari-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: baari
+      POSTGRES_USER: baari
+      POSTGRES_PASSWORD: baari_dev            # override in production
+    ports:
+      - "5432:5432"                           # local dev only — remove in production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d    # runs 0001_init.sql on first start
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U baari -d baari"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis / Valkey ──────────────────────────────────────────────────────────
+  # Note: Use DO Managed Caching for Valkey in production (Managed Redis discontinued June 2025)
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: baari-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"                           # local dev only — remove in production
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── Fastify API ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: baari-api
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgres://baari:baari_dev@postgres:5432/baari
+      REDIS_URL: redis://valkey:6379
+      API_PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+
+  # ── Next.js Web ─────────────────────────────────────────────────────────────
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: baari-web
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      API_URL: http://api:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # ── Caddy (reverse proxy + auto SSL) ────────────────────────────────────────
+  # Caddy automatically obtains and renews Let's Encrypt certs.
+  # 3 lines of config vs Nginx's nginx.conf + certbot + cron.
+  caddy:
+    image: caddy:2-alpine
+    container_name: baari-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"               # HTTP/3
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  valkey_data:
+  caddy_data:
+  caddy_config:

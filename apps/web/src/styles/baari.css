@@ -1,0 +1,446 @@
+/* ============================================================
+   Baari Design System — Foundations
+   باری · "Your turn." Booking-native, direct, warm.
+   Colors + Type tokens
+   ============================================================ */
+
+/* ---------- Webfonts (real brand fonts) ---------- */
+/* Body:    Basis Grotesque Arabic Pro — Colophon Foundry (neutral grotesque,
+            supports both Latin + Arabic — important for بَاری)
+   Display: Rework Headline (TRIAL) — Atipo Foundry (elegant transitional serif w/ italic flair)
+   Files live in /fonts. The .otf files for Rework are loaded with format('opentype'). */
+
+@font-face {
+  font-family: 'Basis Grotesque Pro';
+  src: url('fonts/BasisGrotesqueArabicPro-Light.ttf') format('truetype');
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Basis Grotesque Pro';
+  src: url('fonts/BasisGrotesqueArabicPro-Regular.ttf') format('truetype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Basis Grotesque Pro';
+  src: url('fonts/BasisGrotesqueArabicPro-Medium.ttf') format('truetype');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Basis Grotesque Pro';
+  src: url('fonts/BasisGrotesqueArabicPro-Bold.ttf') format('truetype');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Basis Grotesque Pro';
+  src: url('fonts/BasisGrotesqueArabicPro-Black.ttf') format('truetype');
+  font-weight: 900; font-style: normal; font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Thin.otf') format('opentype');
+  font-weight: 100; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-ThinItalic.otf') format('opentype');
+  font-weight: 100; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Extralight.otf') format('opentype');
+  font-weight: 200; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-ExtralightItalic.otf') format('opentype');
+  font-weight: 200; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Light.otf') format('opentype');
+  font-weight: 300; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-LightItalic.otf') format('opentype');
+  font-weight: 300; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Regular.otf') format('opentype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-RegularItalic.otf') format('opentype');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Semibold.otf') format('opentype');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-SemiboldItalic.otf') format('opentype');
+  font-weight: 600; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-Bold.otf') format('opentype');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Rework Headline';
+  src: url('fonts/ReworkHeadlineTRIAL-BoldItalic.otf') format('opentype');
+  font-weight: 700; font-style: italic; font-display: swap;
+}
+
+:root {
+  /* ============================================================
+     COLOR — Brand palette
+     The Baari palette is restrained: black, warm off-whites, a
+     single ELECTRIC LIME accent (#E8FF47) for energy + "your turn"
+     immediacy, and dark espresso browns to keep the editorial warmth.
+     ============================================================ */
+
+  /* Brand — Electric Lime (replaces the old champagne gold) */
+  --baari-lime:        #E8FF47;   /* primary accent — buttons, highlights, focused surfaces */
+  --baari-lime-deep:   #C8D93A;   /* hover / pressed */
+  --baari-lime-soft:   #EFFFAD;   /* selected state fills */
+  --baari-lime-wash:   #FAFFF0;   /* faintest tint, section bg */
+
+  /* ⚠️ Contrast rules — lime is a BACKGROUND color, not a text color.
+        - On dark (#0D0D0D / onyx): lime text passes WCAG AA (15:1) ✓
+        - On cream (#F7F2E9):       lime text FAILS (1.4:1) ✗
+     Use the .on-lime utility (dark text on a lime surface) for buttons,
+     pills, callouts. Never set color: var(--baari-lime) on a light bg. */
+
+  --baari-espresso:    #322B20;   /* secondary dark — text on cream, deep surface */
+  --baari-onyx:        #0D0D0D;   /* primary dark background (per brand spec) */
+  --baari-ink:         #282219;   /* link / heavy text on light */
+
+  /* Neutrals — warm cream → bone → onyx */
+  --baari-cream:       #F7F2E9;   /* page background, light mode */
+  --baari-bone:        #EFE8DA;   /* card / section divider on cream */
+  --baari-sand:        #D9CFBC;   /* muted divider, secondary border */
+  --baari-stone:       #8A8275;   /* mid neutral, captions */
+  --baari-graphite:    #4A443B;   /* secondary text on cream */
+
+  /* Semantic — status */
+  --baari-success:     #4E7C58;
+  --baari-warning:     #C8923C;
+  --baari-error:       #B5483A;
+  --baari-info:        #4F6E89;
+
+  /* ---------- Semantic tokens (LIGHT — cream background) ---------- */
+  --bg:               var(--baari-cream);
+  --bg-elevated:      #FFFFFF;
+  --bg-subtle:        var(--baari-bone);
+  --bg-accent:        var(--baari-lime);          /* lime is bg-only on light */
+  --bg-accent-soft:   var(--baari-lime-soft);
+  --bg-inverse:       var(--baari-onyx);
+
+  --fg:               var(--baari-onyx);          /* primary text */
+  --fg-secondary:     var(--baari-graphite);      /* body text */
+  --fg-muted:         var(--baari-stone);         /* captions, helper */
+  --fg-inverse:       #FFFFFF;
+  --fg-on-accent:     var(--baari-onyx);          /* text ON lime surface — always dark */
+  --fg-accent:        var(--baari-ink);           /* accent text on light: ink, NOT lime */
+  --fg-link:          var(--baari-ink);
+  --fg-link-hover:    var(--baari-graphite);
+
+  --border:           var(--baari-sand);
+  --border-strong:    var(--baari-espresso);
+  --border-subtle:    rgba(40, 34, 25, 0.10);
+  --border-accent:    var(--baari-lime-deep);     /* accent border that still reads on light */
+
+  /* Focus ring — uses lime since the ring is decorative not text */
+  --ring:             rgba(232, 255, 71, 0.55);
+  --ring-strong:      var(--baari-lime-deep);
+
+  /* ============================================================
+     TYPE — Font stacks
+     ============================================================ */
+  --font-display:     'Rework Headline', 'Tiempos Headline', 'Instrument Serif', 'Times New Roman', serif;
+  --font-body:        'Basis Grotesque Pro', 'DM Sans', -apple-system, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:        'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale — dramatic display sizes against a tight modular scale
+     for UI text. */
+  --fs-display-xl:    96px;   /* hero — "Skip the wait. Take your باری." */
+  --fs-display-lg:    72px;
+  --fs-display-md:    56px;
+  --fs-display-sm:    40px;
+  --fs-h1:            48px;
+  --fs-h2:            36px;
+  --fs-h3:            28px;
+  --fs-h4:            22px;
+  --fs-h5:            18px;
+  --fs-body-lg:       20px;
+  --fs-body:          18px;   /* body default per brand */
+  --fs-body-sm:       15px;
+  --fs-caption:       13px;
+  --fs-micro:         11px;
+
+  /* Line heights */
+  --lh-display:       1.02;
+  --lh-heading:       1.12;
+  --lh-body:          1.55;
+  --lh-tight:         1.25;
+
+  /* Letter spacing */
+  --tracking-display: -0.02em;     /* display serif tightens slightly */
+  --tracking-body:    0em;
+  --tracking-caps:    0.14em;      /* small caps eyebrows */
+  --tracking-button:  0.02em;
+
+  /* Weights */
+  --fw-light:         300;
+  --fw-regular:       400;
+  --fw-medium:        500;
+  --fw-semibold:      600;
+  --fw-bold:          700;
+
+  /* ============================================================
+     SPACING / RADII / SHADOWS
+     ============================================================ */
+  --space-0:  0;
+  --space-1:  4px;     /* base unit per brand spec */
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  56px;
+  --space-10: 72px;
+  --space-11: 96px;
+  --space-12: 128px;
+
+  /* Radii — architectural: small radii on inputs (0),
+     soft radii on buttons (6), and large pills on tags. */
+  --radius-none:  0;
+  --radius-xs:    2px;          /* base radius per brand spec */
+  --radius-sm:    4px;
+  --radius-md:    6px;          /* button radius */
+  --radius-lg:    12px;
+  --radius-xl:    20px;
+  --radius-pill:  999px;
+
+  /* Borders */
+  --border-w:     1px;
+  --border-w-2:   1.5px;        /* used on hover/focus emphasis */
+
+  /* Shadows — used sparingly, tinted warm */
+  --shadow-none:  none;
+  --shadow-sm:    0 1px 2px rgba(40, 34, 25, 0.06);
+  --shadow-md:    0 4px 16px rgba(40, 34, 25, 0.08);
+  --shadow-lg:    0 12px 40px rgba(40, 34, 25, 0.12);
+  --shadow-ring:  0 0 0 3px var(--ring);
+
+  /* Motion */
+  --ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast:     150ms;
+  --dur-med:      280ms;
+  --dur-slow:     520ms;
+}
+
+/* ============================================================
+   DARK theme — flips bg/fg. Lime IS text-safe on dark, so the
+   accent reads loud and clear here.
+   ============================================================ */
+[data-theme="dark"],
+.baari-dark {
+  --bg:               var(--baari-onyx);
+  --bg-elevated:      #131110;
+  --bg-subtle:        #1B1815;
+  --bg-inverse:       var(--baari-cream);
+
+  --fg:               #FFFFFF;
+  --fg-secondary:     #C9C2B3;
+  --fg-muted:         #8A8275;
+  --fg-inverse:       var(--baari-onyx);
+  --fg-accent:        var(--baari-lime);          /* lime IS readable on onyx — 15:1 */
+  --fg-link:          var(--baari-lime);
+  --fg-link-hover:    var(--baari-lime-soft);
+
+  --border:           rgba(255, 255, 255, 0.12);
+  --border-strong:    var(--baari-lime);
+  --border-subtle:    rgba(255, 255, 255, 0.06);
+
+  --shadow-sm:        0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md:        0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg:        0 12px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================================
+   "on-lime" — always-dark text on a lime surface.
+   Use on buttons, pills, callouts whose background is lime.
+   ============================================================ */
+.on-lime { color: var(--baari-onyx); }
+
+/* ============================================================
+   SEMANTIC TYPE — element defaults
+   ============================================================ */
+.baari-display, h1.display {
+  font-family: var(--font-display);
+  font-size:   var(--fs-display-xl);
+  line-height: var(--lh-display);
+  letter-spacing: var(--tracking-display);
+  font-weight: 200;
+  color: var(--fg);
+}
+
+.baari-h1, h1 {
+  font-family: var(--font-display);
+  font-size:   var(--fs-h1);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--tracking-display);
+  font-weight: 200;
+  color: var(--fg);
+}
+
+.baari-h2, h2 {
+  font-family: var(--font-display);
+  font-size:   var(--fs-h2);
+  line-height: var(--lh-heading);
+  letter-spacing: var(--tracking-display);
+  font-weight: 200;
+  color: var(--fg);
+}
+
+.baari-h3, h3 {
+  font-family: var(--font-body);
+  font-size:   var(--fs-h3);
+  line-height: var(--lh-heading);
+  font-weight: var(--fw-medium);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.baari-h4, h4 {
+  font-family: var(--font-body);
+  font-size:   var(--fs-h4);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+}
+
+.baari-h5, h5 {
+  font-family: var(--font-body);
+  font-size:   var(--fs-h5);
+  line-height: var(--lh-tight);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+}
+
+.baari-body, p {
+  font-family: var(--font-body);
+  font-size:   var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-regular);
+  color: var(--fg-secondary);
+}
+
+.baari-body-lg {
+  font-size:   var(--fs-body-lg);
+  line-height: var(--lh-body);
+}
+
+.baari-body-sm {
+  font-size:   var(--fs-body-sm);
+  line-height: 1.5;
+}
+
+.baari-caption {
+  font-family: var(--font-body);
+  font-size:   var(--fs-caption);
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.baari-eyebrow {
+  font-family: var(--font-body);
+  font-size:   var(--fs-caption);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  font-weight: var(--fw-medium);
+  color: var(--fg-muted);
+}
+
+.baari-italic { font-style: italic; }
+
+/* Arabic / Urdu rendering — Basis Grotesque Arabic Pro carries the
+   شَدّہ for "باری" beautifully. Use this class around the wordmark
+   when you want a slightly heavier display setting. */
+.baari-urdu {
+  font-family: 'Basis Grotesque Pro', 'Noto Naskh Arabic', serif;
+  direction: rtl;
+  font-feature-settings: "calt" 1, "liga" 1;
+}
+
+/* ============================================================
+   The signature headline treatment — a phrase split across THIN
+   and BOLD weights of the SAME serif (Rework Headline). The bold
+   word(s) carry emphasis. No italic, no color shift.
+   Example: "Skip the wait. <strong>Take your turn.</strong>"
+   ============================================================ */
+.baari-flourish,
+.baari-display,
+h1.display,
+.baari-h1,
+h1,
+.baari-h2,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 200;          /* thin/extralight body of the headline */
+}
+
+.baari-flourish strong,
+.baari-display strong,
+h1.display strong,
+.baari-h1 strong, h1 strong,
+.baari-h2 strong, h2 strong,
+.baari-flourish b,
+.baari-display b {
+  font-weight: 700;          /* the emphasised phrase */
+  font-style: normal;
+  color: inherit;
+}
+
+/* Optional italic flourish — used sparingly. On light, this stays
+   ink-colored (lime would fail contrast). Apply with .baari-accent-italic. */
+.baari-accent-italic {
+  font-style: italic;
+  color: var(--baari-ink);
+  font-weight: 400;
+}
+
+a, .baari-link {
+  color: var(--fg-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+a:hover, .baari-link:hover { color: var(--fg-link-hover); }
+
+/* Base reset niceties */
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--baari-lime);
+  color: var(--baari-onyx);
+}
