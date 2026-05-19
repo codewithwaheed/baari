@@ -1,5 +1,6 @@
 // apps/web/src/components/dashboard/data.ts
 // Seed data + shared types for the dashboard.
+// Reflects a male barbershop context.
 // All monetary values are stored in paisa (PKR × 100) per spec.
 
 import type { BookingStatus } from './primitives';
@@ -61,115 +62,129 @@ export interface Client {
 export interface ServiceItem {
   name: string;
   price: number; // paisa
-  dur: number; // hours
+  dur: number;   // hours
 }
 
 export const STAFF: Staff[] = [
-  { id: 'ayesha', name: 'Ayesha', role: 'Senior Stylist',   color: '#322B20' },
-  { id: 'sana',   name: 'Sana',   role: 'Color Specialist', color: '#4F6E89' },
-  { id: 'hira',   name: 'Hira',   role: 'Esthetician',      color: '#4E7C58' },
-  { id: 'zoya',   name: 'Zoya',   role: 'Nail Technician',  color: '#8A6B3A' },
+  { id: 'usman',  name: 'Usman',  role: 'Senior Barber',     color: '#322B20' },
+  { id: 'hassan', name: 'Hassan', role: 'Color Specialist',  color: '#4F6E89' },
+  { id: 'bilal',  name: 'Bilal',  role: 'Barber',            color: '#4E7C58' },
+  { id: 'ahmed',  name: 'Ahmed',  role: 'Grooming Expert',   color: '#8A6B3A' },
 ];
 
 export const SEED_APPTS: Appointment[] = [
-  { id: 'a1', staff: 'ayesha', client: 'Mehwish Khan',   phone: '0300 1234 567', service: 'Bridal Makeup Trial',  start:  9.0, end: 11.0, status: 'completed',      price: 1800000 },
-  { id: 'a2', staff: 'ayesha', client: 'Aiman Saeed',    phone: '0321 4567 890', service: 'Cut + Blow Dry',       start: 12.0, end: 13.5, status: 'checkedIn',      price:  450000 },
-  { id: 'a3', staff: 'ayesha', client: 'Rabia Naveed',   phone: '0333 2345 678', service: 'Keratin Treatment',    start: 15.0, end: 17.5, status: 'confirmed',      price: 1500000 },
-  { id: 'b1', staff: 'sana',   client: 'Hadia Mahmood',  phone: '0301 9876 543', service: 'Highlights',           start: 10.0, end: 12.5, status: 'pendingPayment', price: 1200000 },
-  { id: 'b2', staff: 'sana',   client: 'Maham Rauf',     phone: '0322 1122 334', service: 'Global Color',         start: 13.5, end: 15.5, status: 'confirmed',      price:  850000 },
-  { id: 'b3', staff: 'sana',   client: 'Nida Faisal',    phone: '0345 7788 990', service: 'Balayage',             start: 16.0, end: 18.5, status: 'confirmed',      price: 1400000 },
-  { id: 'c1', staff: 'hira',   client: 'Komal Akhtar',   phone: '0311 5544 332', service: 'Hydrating Facial',     start:  9.5, end: 10.5, status: 'completed',      price:  550000 },
-  { id: 'c2', staff: 'hira',   client: 'Sara Ijaz',      phone: '0334 6677 889', service: 'Threading + Brow Wax', start: 11.0, end: 11.5, status: 'noShow',         price:  200000 },
-  { id: 'c3', staff: 'hira',   client: 'Aisha Raza',     phone: '0302 8899 776', service: 'Bridal Makeup',        start: 14.0, end: 18.0, status: 'confirmed',      price: 3500000 },
-  { id: 'd1', staff: 'zoya',   client: 'Bushra Mehmood', phone: '0312 3344 556', service: 'Mani + Pedi',          start: 10.0, end: 11.5, status: 'confirmed',      price:  550000 },
-  { id: 'd2', staff: 'zoya',   client: 'Faiza Tariq',    phone: '0335 9988 776', service: 'Gel Manicure',         start: 12.5, end: 13.5, status: 'pendingPayment', price:  350000 },
-  { id: 'd3', staff: 'zoya',   client: 'Tania Wasim',    phone: '0303 4455 667', service: 'Pedicure Deluxe',      start: 15.0, end: 16.0, status: 'confirmed',      price:  400000 },
+  { id: 'a1', staff: 'usman',  client: 'Saad Butt',       phone: '0300 1234 567', service: 'Fade + Beard Trim',  start:  9.0, end: 10.0, status: 'completed',      price:  180000 },
+  { id: 'a2', staff: 'usman',  client: 'Ali Raza',        phone: '0321 4567 890', service: 'Hair + Beard Combo', start: 11.0, end: 12.0, status: 'checkedIn',      price:  150000 },
+  { id: 'a3', staff: 'usman',  client: 'Hamza Sheikh',    phone: '0333 2345 678', service: 'Keratin Treatment',  start: 14.0, end: 16.5, status: 'confirmed',      price:  800000 },
+  { id: 'b1', staff: 'hassan', client: 'Zain Malik',      phone: '0301 9876 543', service: 'Global Color',       start: 10.0, end: 12.0, status: 'pendingPayment', price:  650000 },
+  { id: 'b2', staff: 'hassan', client: 'Faisal Qureshi',  phone: '0322 1122 334', service: 'Highlights',         start: 13.0, end: 15.0, status: 'confirmed',      price:  850000 },
+  { id: 'b3', staff: 'hassan', client: 'Omar Farooq',     phone: '0345 7788 990', service: 'Hair Spa',           start: 15.5, end: 16.5, status: 'confirmed',      price:  300000 },
+  { id: 'c1', staff: 'bilal',  client: 'Talha Ahmed',     phone: '0311 5544 332', service: 'Clean Shave',        start:  9.5, end: 10.0, status: 'completed',      price:   80000 },
+  { id: 'c2', staff: 'bilal',  client: 'Umar Hayat',      phone: '0334 6677 889', service: 'Haircut',            start: 11.0, end: 11.5, status: 'noShow',         price:  120000 },
+  { id: 'c3', staff: 'bilal',  client: 'Shahzaib Mirza',  phone: '0302 8899 776', service: 'Fade + Lineup',      start: 14.0, end: 15.0, status: 'confirmed',      price:  160000 },
+  { id: 'd1', staff: 'ahmed',  client: 'Asad Khan',       phone: '0312 3344 556', service: 'Head Massage',       start: 10.0, end: 10.5, status: 'confirmed',      price:  120000 },
+  { id: 'd2', staff: 'ahmed',  client: 'Bilal Chaudhry',  phone: '0335 9988 776', service: 'Facial for Men',     start: 11.5, end: 12.5, status: 'pendingPayment', price:  250000 },
+  { id: 'd3', staff: 'ahmed',  client: 'Raza Hussain',    phone: '0303 4455 667', service: 'Beard Sculpt',       start: 15.0, end: 15.5, status: 'confirmed',      price:  100000 },
 ];
 
 export const SEED_REQUESTS: BookingRequest[] = [
-  { id: 'r1', client: 'Hina Yousaf',    phone: '0300 5566 778', service: 'Haircut + Blow Dry',  staff: 'Ayesha', day: 'Today',    time: 17.0, paid: true,  amount:  450000 },
-  { id: 'r2', client: 'Zara Iqbal',     phone: '0321 8899 220', service: 'Hydrating Facial',    staff: 'Hira',   day: 'Tomorrow', time: 11.0, paid: false, amount:  550000 },
-  { id: 'r3', client: 'Mariyam Sheikh', phone: '0345 1100 234', service: 'Highlights',          staff: 'Sana',   day: 'Tomorrow', time: 14.5, paid: true,  amount: 1200000 },
-  { id: 'r4', client: 'Sumbal Asif',    phone: '0333 6677 010', service: 'Gel Manicure',        staff: 'Zoya',   day: 'May 19',   time: 10.0, paid: false, amount:  350000 },
-  { id: 'r5', client: 'Ifrah Bilal',    phone: '0301 2233 445', service: 'Bridal Makeup Trial', staff: 'Ayesha', day: 'May 20',   time: 16.0, paid: true,  amount: 1800000 },
+  { id: 'r1', client: 'Ahsan Tariq',   phone: '0300 5566 778', service: 'Fade + Beard Trim',  staff: 'Usman',  day: 'Today',    time: 17.0, paid: true,  amount:  180000 },
+  { id: 'r2', client: 'Junaid Iqbal',  phone: '0321 8899 220', service: 'Facial for Men',     staff: 'Ahmed',  day: 'Tomorrow', time: 11.0, paid: false, amount:  250000 },
+  { id: 'r3', client: 'Waqas Noor',    phone: '0345 1100 234', service: 'Global Color',       staff: 'Hassan', day: 'Tomorrow', time: 14.5, paid: true,  amount:  650000 },
+  { id: 'r4', client: 'Imran Siddiq',  phone: '0333 6677 010', service: 'Hair Spa',           staff: 'Hassan', day: 'May 19',   time: 10.0, paid: false, amount:  300000 },
+  { id: 'r5', client: 'Kamran Bajwa',  phone: '0301 2233 445', service: 'Keratin Treatment',  staff: 'Usman',  day: 'May 20',   time: 16.0, paid: true,  amount:  800000 },
 ];
 
 export const SEED_CLIENTS: Client[] = [
-  { id: 'cl1', name: 'Mehwish Khan',   phone: '0300 1234 567', vip: true,  lastVisit: 'May 17, 2026', visits: 14, whatsappOptIn: true,
-    notes: 'Prefers warm undertones. Allergic to ammonia-based colors. Always offer chai before service.',
+  {
+    id: 'cl1', name: 'Saad Butt', phone: '0300 1234 567', vip: true,
+    lastVisit: 'May 17, 2026', visits: 14, whatsappOptIn: true,
+    notes: 'Prefers low fade on sides, medium on top. Beard sculpted square. Regular every 3 weeks.',
     history: [
-      { service: 'Bridal Makeup Trial', date: 'May 17, 2026', staff: 'Ayesha', amount: 1800000 },
-      { service: 'Hair Spa + Mask',     date: 'May 02, 2026', staff: 'Ayesha', amount:  450000 },
-      { service: 'Highlights',          date: 'Apr 18, 2026', staff: 'Sana',   amount: 1200000 },
-      { service: 'Threading',           date: 'Apr 04, 2026', staff: 'Hira',   amount:   80000 },
+      { service: 'Fade + Beard Trim',  date: 'May 17, 2026', staff: 'Usman',  amount: 180000 },
+      { service: 'Hair + Beard Combo', date: 'Apr 26, 2026', staff: 'Usman',  amount: 150000 },
+      { service: 'Highlights',         date: 'Apr 02, 2026', staff: 'Hassan', amount: 850000 },
+      { service: 'Clean Shave',        date: 'Mar 15, 2026', staff: 'Bilal',  amount:  80000 },
     ],
   },
-  { id: 'cl2', name: 'Aiman Saeed',    phone: '0321 4567 890', vip: false, lastVisit: 'May 17, 2026', visits: 3, whatsappOptIn: true,
-    notes: 'New client referred by Mehwish. Sensitive scalp — use mild shampoo only.',
+  {
+    id: 'cl2', name: 'Ali Raza', phone: '0321 4567 890', vip: false,
+    lastVisit: 'May 17, 2026', visits: 4, whatsappOptIn: true,
+    notes: 'New client. Sensitive scalp — use sulfate-free products.',
     history: [
-      { service: 'Cut + Blow Dry', date: 'May 17, 2026', staff: 'Ayesha', amount: 450000 },
-      { service: 'Cut + Blow Dry', date: 'Apr 12, 2026', staff: 'Ayesha', amount: 450000 },
-      { service: 'Consultation',   date: 'Mar 28, 2026', staff: 'Ayesha', amount: 0 },
+      { service: 'Hair + Beard Combo', date: 'May 17, 2026', staff: 'Usman', amount: 150000 },
+      { service: 'Haircut',            date: 'Apr 19, 2026', staff: 'Bilal', amount: 120000 },
     ],
   },
-  { id: 'cl3', name: 'Rabia Naveed',   phone: '0333 2345 678', vip: true,  lastVisit: 'May 17, 2026', visits: 22, whatsappOptIn: true,
-    notes: 'VIP. Books quarterly. Prefers 4pm slots. Husband pays — invoice to him.',
+  {
+    id: 'cl3', name: 'Hamza Sheikh', phone: '0333 2345 678', vip: true,
+    lastVisit: 'May 17, 2026', visits: 22, whatsappOptIn: true,
+    notes: 'VIP. Books quarterly for keratin. Always in afternoon slots. Pays cash only.',
     history: [
-      { service: 'Keratin Treatment', date: 'May 17, 2026', staff: 'Ayesha', amount: 1500000 },
-      { service: 'Cut + Color',       date: 'Feb 14, 2026', staff: 'Sana',   amount: 1250000 },
-      { service: 'Bridal Touchup',    date: 'Nov 22, 2025', staff: 'Ayesha', amount: 2500000 },
+      { service: 'Keratin Treatment', date: 'May 17, 2026', staff: 'Usman',  amount: 800000 },
+      { service: 'Keratin Treatment', date: 'Feb 08, 2026', staff: 'Usman',  amount: 800000 },
+      { service: 'Hair Spa',          date: 'Jan 11, 2026', staff: 'Hassan', amount: 300000 },
     ],
   },
-  { id: 'cl4', name: 'Hadia Mahmood',  phone: '0301 9876 543', vip: false, lastVisit: 'May 17, 2026', visits: 7, whatsappOptIn: false,
-    notes: 'Booked via Instagram DM. Prefers communication via call, not WhatsApp.',
+  {
+    id: 'cl4', name: 'Zain Malik', phone: '0301 9876 543', vip: false,
+    lastVisit: 'May 17, 2026', visits: 7, whatsappOptIn: false,
+    notes: 'Booked via Instagram. Prefers contact via call, not WhatsApp.',
     history: [
-      { service: 'Highlights', date: 'May 17, 2026', staff: 'Sana', amount: 1200000 },
-      { service: 'Toner',      date: 'Apr 03, 2026', staff: 'Sana', amount:  350000 },
+      { service: 'Global Color', date: 'May 17, 2026', staff: 'Hassan', amount: 650000 },
+      { service: 'Highlights',   date: 'Mar 22, 2026', staff: 'Hassan', amount: 850000 },
     ],
   },
-  { id: 'cl5', name: 'Komal Akhtar',   phone: '0311 5544 332', vip: false, lastVisit: 'May 17, 2026', visits: 4, whatsappOptIn: true,
-    notes: 'Acne-prone, oily T-zone. Avoid heavy creams.',
+  {
+    id: 'cl5', name: 'Talha Ahmed', phone: '0311 5544 332', vip: false,
+    lastVisit: 'May 17, 2026', visits: 5, whatsappOptIn: true,
+    notes: 'Quick in-and-out. Never wants product. Straight razor shave only.',
     history: [
-      { service: 'Hydrating Facial', date: 'May 17, 2026', staff: 'Hira', amount: 550000 },
-      { service: 'Hydrating Facial', date: 'Apr 19, 2026', staff: 'Hira', amount: 550000 },
+      { service: 'Clean Shave', date: 'May 17, 2026', staff: 'Bilal', amount:  80000 },
+      { service: 'Clean Shave', date: 'Apr 24, 2026', staff: 'Bilal', amount:  80000 },
     ],
   },
-  { id: 'cl6', name: 'Aisha Raza',     phone: '0302 8899 776', vip: true,  lastVisit: 'May 17, 2026', visits: 11, whatsappOptIn: true,
-    notes: 'Bride — wedding May 20. Final trial today. Photos already sent.',
+  {
+    id: 'cl6', name: 'Asad Khan', phone: '0312 3344 556', vip: true,
+    lastVisit: 'May 17, 2026', visits: 11, whatsappOptIn: true,
+    notes: 'Comes in every two weeks. Head massage + haircut package. Prefers Ahmed.',
     history: [
-      { service: 'Bridal Makeup',       date: 'May 17, 2026', staff: 'Hira', amount: 3500000 },
-      { service: 'Bridal Makeup Trial', date: 'May 10, 2026', staff: 'Hira', amount: 1800000 },
-      { service: 'Facial — Glow',       date: 'Apr 28, 2026', staff: 'Hira', amount:  750000 },
+      { service: 'Head Massage',        date: 'May 17, 2026', staff: 'Ahmed', amount: 120000 },
+      { service: 'Head Massage + Cut',  date: 'May 03, 2026', staff: 'Ahmed', amount: 250000 },
+      { service: 'Facial for Men',      date: 'Apr 15, 2026', staff: 'Ahmed', amount: 250000 },
     ],
   },
-  { id: 'cl7', name: 'Bushra Mehmood', phone: '0312 3344 556', vip: false, lastVisit: 'May 17, 2026', visits: 6, whatsappOptIn: true,
-    notes: 'Likes nude / OPI pale pink. Filing — almond shape.',
+  {
+    id: 'cl7', name: 'Omar Farooq', phone: '0345 7788 990', vip: false,
+    lastVisit: 'May 17, 2026', visits: 3, whatsappOptIn: true,
+    notes: 'Experimenting with hair color. Currently going lighter. Patch test done.',
     history: [
-      { service: 'Mani + Pedi', date: 'May 17, 2026', staff: 'Zoya', amount: 550000 },
-      { service: 'Gel Mani',    date: 'Apr 25, 2026', staff: 'Zoya', amount: 350000 },
+      { service: 'Hair Spa',    date: 'May 17, 2026', staff: 'Hassan', amount: 300000 },
+      { service: 'Highlights',  date: 'Apr 30, 2026', staff: 'Hassan', amount: 850000 },
     ],
   },
-  { id: 'cl8', name: 'Nida Faisal',    phone: '0345 7788 990', vip: false, lastVisit: 'May 17, 2026', visits: 2, whatsappOptIn: true,
+  {
+    id: 'cl8', name: 'Bilal Chaudhry', phone: '0335 9988 776', vip: false,
+    lastVisit: 'May 17, 2026', visits: 2, whatsappOptIn: true,
     notes: '',
     history: [
-      { service: 'Balayage', date: 'May 17, 2026', staff: 'Sana', amount: 1400000 },
+      { service: 'Facial for Men', date: 'May 17, 2026', staff: 'Ahmed', amount: 250000 },
     ],
   },
 ];
 
 export const SERVICES: ServiceItem[] = [
-  { name: 'Cut + Blow Dry',      price:  450000, dur: 1.5 },
-  { name: 'Haircut',             price:  250000, dur: 1.0 },
-  { name: 'Global Color',        price:  850000, dur: 2.0 },
-  { name: 'Highlights',          price: 1200000, dur: 2.5 },
-  { name: 'Balayage',            price: 1400000, dur: 2.5 },
-  { name: 'Keratin Treatment',   price: 1500000, dur: 2.5 },
-  { name: 'Hydrating Facial',    price:  550000, dur: 1.0 },
-  { name: 'Threading',           price:   80000, dur: 0.25 },
-  { name: 'Brow Wax',            price:  120000, dur: 0.5 },
-  { name: 'Mani + Pedi',         price:  550000, dur: 1.5 },
-  { name: 'Gel Manicure',        price:  350000, dur: 1.0 },
-  { name: 'Pedicure Deluxe',     price:  400000, dur: 1.0 },
-  { name: 'Bridal Makeup Trial', price: 1800000, dur: 2.0 },
-  { name: 'Bridal Makeup',       price: 3500000, dur: 4.0 },
+  { name: 'Haircut',            price:  120000, dur: 0.5 },
+  { name: 'Fade Cut',           price:  160000, dur: 0.75 },
+  { name: 'Fade + Beard Trim',  price:  180000, dur: 1.0 },
+  { name: 'Hair + Beard Combo', price:  150000, dur: 1.0 },
+  { name: 'Beard Trim',         price:   80000, dur: 0.5 },
+  { name: 'Beard Sculpt',       price:  100000, dur: 0.5 },
+  { name: 'Clean Shave',        price:   80000, dur: 0.5 },
+  { name: 'Head Massage',       price:  120000, dur: 0.5 },
+  { name: 'Facial for Men',     price:  250000, dur: 1.0 },
+  { name: 'Hair Spa',           price:  300000, dur: 1.0 },
+  { name: 'Global Color',       price:  650000, dur: 2.0 },
+  { name: 'Highlights',         price:  850000, dur: 2.0 },
+  { name: 'Keratin Treatment',  price:  800000, dur: 2.5 },
 ];
