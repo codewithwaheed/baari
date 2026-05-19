@@ -1,52 +1,141 @@
-// apps/web/src/app/dashboard/page.tsx
-// Dashboard shell — wires Sidebar + Topbar + views + panels.
-// TODO: Replace seed data with real API calls to apps/api.
-
 'use client';
 
 import { useState } from 'react';
-// TODO: import all components from @/components/dashboard/ as they are built
-
-export type NavId =
-  | 'calendar' | 'requests' | 'clients' | 'settings'
-  | 'waitlist' | 'messages' | 'inventory' | 'marketing' | 'reports' | 'billie';
+import { Sidebar } from '@/components/dashboard/Sidebar';
+import { Topbar } from '@/components/dashboard/Topbar';
+import { Calendar } from '@/components/dashboard/Calendar';
+import { AppointmentPanel, AppointmentPanelEmpty } from '@/components/dashboard/AppointmentPanel';
+import { POSPanel } from '@/components/dashboard/POSPanel';
+import { RequestsView } from '@/components/dashboard/RequestsView';
+import { ClientsView } from '@/components/dashboard/ClientsView';
+import { NewBookingModal } from '@/components/dashboard/NewBookingModal';
+import { ComingSoon, SettingsStub } from '@/components/dashboard/ComingSoon';
+import {
+  SEED_APPTS, SEED_REQUESTS, SEED_CLIENTS,
+  type NavId, type Appointment, type Client,
+} from '@/components/dashboard/data';
 
 const VIEW_TITLES: Record<NavId, string> = {
-  calendar: 'Calendar', requests: 'Requests', clients: 'Clients',
-  settings: 'Settings', waitlist: 'Waitlist', messages: 'Messages',
-  inventory: 'Inventory', marketing: 'Marketing', reports: 'Reports', billie: 'Ask Billie',
+  calendar:  'Calendar',
+  requests:  'Requests',
+  clients:   'Clients',
+  settings:  'Settings',
+  waitlist:  'Waitlist',
+  messages:  'Messages',
+  inventory: 'Inventory',
+  marketing: 'Marketing',
+  reports:   'Reports',
+  billie:    'Ask Billie',
 };
 
 const LOCKED_VIEWS: NavId[] = ['waitlist', 'messages', 'inventory', 'marketing', 'reports', 'billie'];
 
 export default function DashboardPage() {
-  const [nav, setNav] = useState<NavId>('calendar');
+  const [nav, setNav]               = useState<NavId>('calendar');
+  const [date, setDate]             = useState(() => new Date());
+  const [appts, setAppts]           = useState<Appointment[]>(SEED_APPTS);
+  const [requests, setRequests]     = useState(SEED_REQUESTS);
+  const [clients, setClients]       = useState<Client[]>(SEED_CLIENTS);
+  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
+  const [posAppt, setPosAppt]       = useState<Appointment | null>(null);
+  const [modalOpen, setModalOpen]   = useState(false);
+
+  const navigate = (id: NavId) => {
+    setNav(id);
+    setSelectedAppt(null);
+    setPosAppt(null);
+  };
+
+  const updateClientNotes = (id: string, notes: string) => {
+    setClients(prev => prev.map(c => c.id === id ? { ...c, notes } : c));
+  };
+
+  const handleMove = (apptId: string, newStart: number, newEnd: number) => {
+    setAppts(prev => prev.map(a => a.id === apptId ? { ...a, start: newStart, end: newEnd } : a));
+    setSelectedAppt(prev => prev?.id === apptId ? { ...prev, start: newStart, end: newEnd } : prev);
+  };
+
+  const isCalendar = nav === 'calendar';
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: 'var(--font-body)' }}>
-      {/*
-        TODO: As you build each component, uncomment and wire it in.
+      <Sidebar
+        active={nav}
+        onNavigate={navigate}
+        requestsCount={requests.length}
+      />
 
-        <Sidebar active={nav} onNavigate={setNav} requestsCount={3} />
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Topbar
+          title={VIEW_TITLES[nav]}
+          showDate={isCalendar}
+          date={date}
+          onDateChange={setDate}
+          onNew={() => setModalOpen(true)}
+        />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Topbar title={VIEW_TITLES[nav]} showDate={nav === 'calendar'} date={new Date()} onDateChange={...} onNew={...} />
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
-            {nav === 'calendar' && <Calendar ... />}
-            {nav === 'requests' && <RequestsView ... />}
-            {nav === 'clients' && <ClientsView ... />}
-            {nav === 'settings' && <SettingsStub />}
-            {LOCKED_VIEWS.includes(nav) && <ComingSoon id={nav} />}
-            {selectedAppt && !posAppt && <AppointmentPanel ... />}
-            {posAppt && <POSPanel ... />}
-          </div>
-        </div>
-      */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--baari-cream)' }}>
-        <div style={{ textAlign: 'center', fontFamily: 'var(--font-display)', fontSize: 32, fontWeight: 200, color: 'var(--baari-onyx)' }}>
-          Build the components in <code style={{ fontFamily: 'var(--font-mono)', fontSize: 18 }}>src/components/dashboard/</code>
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+          {/* Main content area */}
+          {isCalendar && (
+            <Calendar
+              appts={appts}
+              selectedId={selectedAppt?.id ?? null}
+              onSelect={(a) => { setSelectedAppt(a); setPosAppt(null); }}
+              onMove={handleMove}
+            />
+          )}
+          {nav === 'requests' && (
+            <RequestsView
+              requests={requests}
+              onApprove={(r) => setRequests(prev => prev.filter(x => x.id !== r.id))}
+              onDecline={(r) => setRequests(prev => prev.filter(x => x.id !== r.id))}
+            />
+          )}
+          {nav === 'clients' && (
+            <ClientsView clients={clients} onUpdateNotes={updateClientNotes} />
+          )}
+          {nav === 'settings' && <SettingsStub />}
+          {LOCKED_VIEWS.includes(nav) && <ComingSoon id={nav} />}
+
+          {/* Right panel — calendar only */}
+          {isCalendar && !posAppt && selectedAppt && (
+            <AppointmentPanel
+              appt={selectedAppt}
+              client={clients.find(c => c.name === selectedAppt.client) ?? null}
+              onClose={() => setSelectedAppt(null)}
+              onCheckout={() => setPosAppt(selectedAppt)}
+              onReschedule={() => { /* TODO: reschedule flow */ }}
+              onCancel={() => {
+                setAppts(prev => prev.filter(a => a.id !== selectedAppt.id));
+                setSelectedAppt(null);
+              }}
+              onUpdateNotes={updateClientNotes}
+            />
+          )}
+          {isCalendar && !posAppt && !selectedAppt && <AppointmentPanelEmpty />}
+          {isCalendar && posAppt && (
+            <POSPanel
+              appt={posAppt}
+              onBack={() => setPosAppt(null)}
+              onConfirm={() => {
+                setAppts(prev => prev.map(a => a.id === posAppt.id ? { ...a, status: 'completed' } : a));
+                setPosAppt(null);
+                setSelectedAppt(null);
+              }}
+            />
+          )}
         </div>
       </div>
+
+      <NewBookingModal
+        open={modalOpen}
+        defaultDate={date}
+        onClose={() => setModalOpen(false)}
+        onCreate={(appt) => {
+          setAppts(prev => [...prev, appt]);
+          setModalOpen(false);
+        }}
+      />
     </div>
   );
 }
