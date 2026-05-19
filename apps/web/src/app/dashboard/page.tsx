@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+
+const API = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Calendar } from '@/components/dashboard/Calendar';
@@ -46,6 +48,11 @@ export default function DashboardPage() {
     setPosAppt(null);
   };
 
+  const handleLogout = useCallback(async () => {
+    await fetch(`${API}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => null);
+    window.location.href = '/login';
+  }, []);
+
   const updateClientNotes = (id: string, notes: string) => {
     setClients(prev => prev.map(c => c.id === id ? { ...c, notes } : c));
   };
@@ -62,6 +69,7 @@ export default function DashboardPage() {
       <Sidebar
         active={nav}
         onNavigate={navigate}
+        onLogout={handleLogout}
         requestsCount={requests.length}
       />
 

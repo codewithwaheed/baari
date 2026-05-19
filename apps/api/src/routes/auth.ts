@@ -4,7 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { eq } from 'drizzle-orm';
 import { db, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
-import { redis } from '../lib/redis/client';
+import { authRedis as redis } from '../lib/redis/client';
 import {
   generateOTP, storeOTP, validateOTP,
   isPhoneVerified, clearPhoneVerified, checkOTPRateLimit,
@@ -41,6 +41,15 @@ function maskEmail(email: string): string {
 }
 
 export default async function authRoutes(app: FastifyInstance) {
+
+  // Convert Redis-unavailable errors to 503 so clients get a clear signal
+  // instead of a generic 500 when the cache layer is not reachable.
+  app.setErrorHandler((err, _req, reply) => {
+    if (err.message?.includes('max retries per request') || err.message?.includes('ECONNREFUSED')) {
+      return reply.code(503).send({ ok: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'Service temporarily unavailable. Please try again in a moment.' } });
+    }
+    throw err;
+  });
 
   // ── POST /auth/send-otp ──────────────────────────────────────────────────
   app.post<{ Body: { phone: string } }>('/send-otp', async (request, reply) => {
@@ -212,6 +221,27 @@ export default async function authRoutes(app: FastifyInstance) {
     await storeOTP(phone, otp);
     await sendOTP(phone, otp);
     return reply.send({ ok: true, method: 'sms', hint: null });
+  });
+
+  // ── POST /auth/verify-reset-otp ─────────────────────────────────────────────
+  // Verifies the OTP sent by /forgot-password, issues a one-time reset token.
+  app.post<{ Body: { phone: string; otp: string } }>('/verify-reset-otp', async (request, reply) => {
+    const phone = normalizePhone(request.body.phone ?? '');
+    const result = await validateOTP(phone, request.body.otp ?? '');
+
+    if (result === 'expired') return reply.code(401).send({ ok: false, error: { code: 'OTP_EXPIRED',  message: 'Code expired. Request a new one.' } });
+    if (result === 'locked')  return reply.code(401).send({ ok: false, error: { code: 'OTP_LOCKED',   message: 'Too many wrong attempts. Request a new code.' } });
+    if (result === 'wrong')   return reply.code(401).send({ ok: false, error: { code: 'OTP_WRONG',    message: 'Wrong code. Try again.' } });
+
+    const user = await db.query.users.findFirst({ where: eq(schema.users.phoneE164, phone) });
+    if (!user) {
+      return reply.code(404).send({ ok: false, error: { code: 'USER_NOT_FOUND', message: 'No account found.' } });
+    }
+
+    const resetToken = randomUUID();
+    await storeResetToken(user.id, resetToken);
+
+    return reply.send({ ok: true, resetToken });
   });
 
   // ── POST /auth/send-email-otp ────────────────────────────────────────────

@@ -1,5 +1,5 @@
 // apps/api/src/lib/auth/otp.ts
-import { redis } from '../redis/client';
+import { authRedis as redis } from '../redis/client';
 
 const OTP_TTL_SEC      = 300;   // 5 minutes — OTP validity
 const VERIFIED_TTL_SEC = 600;   // 10 minutes — window to complete signup after OTP

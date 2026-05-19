@@ -54,6 +54,8 @@ export function PhoneInput({ value, onChange, error, disabled }: PhoneInputProps
         <input
           type="tel"
           inputMode="numeric"
+          autoComplete="tel"
+          name="phone"
           placeholder="03XX XXX XXXX"
           value={display}
           onChange={handleChange}

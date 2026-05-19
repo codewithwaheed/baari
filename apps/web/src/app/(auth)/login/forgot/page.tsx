@@ -14,7 +14,7 @@ function normalizePhone(raw: string): string {
   return `+${digits}`;
 }
 
-export default function SignupPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const [phone,   setPhone]   = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,24 +33,20 @@ export default function SignupPage() {
     }
 
     try {
-      const res = await fetch(`${API}/api/v1/auth/send-otp`, {
+      const res = await fetch(`${API}/api/v1/auth/forgot-password`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ phone: normalized }),
       });
       const data = await res.json();
 
-      if (res.status === 409) {
-        setError('An account with this number already exists.');
-        return;
-      }
       if (!res.ok) {
-        setError(data.error?.message ?? 'Failed to send code. Try again.');
+        setError(data.error?.message ?? 'Something went wrong. Try again.');
         return;
       }
 
-      sessionStorage.setItem('baari_signup_phone', normalized);
-      router.push('/signup/verify');
+      sessionStorage.setItem('baari_reset_phone', normalized);
+      router.push('/login/forgot/verify');
     } catch {
       setError('Connection error. Try again.');
     } finally {
@@ -60,8 +56,8 @@ export default function SignupPage() {
 
   return (
     <AuthCard
-      title="Register your barbershop"
-      subtitle="Onboard your business on Baari — enter your mobile number to get started."
+      title="Reset your password"
+      subtitle="Enter your registered mobile number. We'll send a one-time code."
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <PhoneInput value={phone} onChange={setPhone} error={error} disabled={loading} />
@@ -100,18 +96,19 @@ export default function SignupPage() {
           {loading ? 'Sending code…' : 'Send code'}
         </button>
 
-        <p style={{
-          textAlign: 'center',
-          fontSize: 'var(--fs-body-sm)',
-          color: 'var(--fg-muted)',
-          fontFamily: 'var(--font-body)',
-          margin: 0,
-        }}>
-          Already have an account?{' '}
-          <a href="/login" style={{ color: 'var(--fg-link)', fontWeight: 'var(--fw-medium)' }}>
-            Sign in
-          </a>
-        </p>
+        <a
+          href="/login"
+          style={{
+            textAlign: 'center',
+            fontSize: 'var(--fs-body-sm)',
+            color: 'var(--fg-muted)',
+            fontFamily: 'var(--font-body)',
+            display: 'block',
+            textDecoration: 'none',
+          }}
+        >
+          ← Back to sign in
+        </a>
       </form>
     </AuthCard>
   );
