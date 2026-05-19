@@ -9,7 +9,9 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+# Always resolve to the MAIN worktree root, not whichever worktree we're called from.
+# `git worktree list` lists the main worktree first; grab its path.
+REPO_ROOT="$(git worktree list --porcelain | awk '/^worktree / { print $2; exit }')"
 BASE_BRANCH="${BASE_BRANCH:-main}"
 WORKTREE_DIR="$REPO_ROOT/.claude/worktrees"
 
@@ -78,19 +80,30 @@ cmd_merge() {
 
   require_clean_main
 
-  git -C "$REPO_ROOT" checkout "$BASE_BRANCH"
-  git -C "$REPO_ROOT" pull --ff-only origin "$BASE_BRANCH" 2>/dev/null || true
-  git -C "$REPO_ROOT" merge --no-ff "$branch" -m "merge: $branch → $BASE_BRANCH"
+  info "Switching to $BASE_BRANCH in main repo ($REPO_ROOT) …"
+  git -C "$REPO_ROOT" checkout "$BASE_BRANCH" \
+    || die "Could not checkout '$BASE_BRANCH' in $REPO_ROOT"
+
+  info "Pulling latest $BASE_BRANCH …"
+  git -C "$REPO_ROOT" pull --ff-only origin "$BASE_BRANCH" 2>/dev/null \
+    && ok "Pulled latest." || warn "Pull skipped (no remote or already up-to-date)."
+
+  info "Merging $branch …"
+  git -C "$REPO_ROOT" merge --no-ff "$branch" -m "merge: $branch → $BASE_BRANCH" \
+    || die "Merge failed — resolve conflicts in $REPO_ROOT then re-run."
 
   ok "Merge complete."
 
   # Remove worktree + branch
   info "Removing worktree at $wt_path …"
-  git -C "$REPO_ROOT" worktree remove "$wt_path" --force
-  git -C "$REPO_ROOT" branch -d "$branch" 2>/dev/null \
-    || warn "Branch '$branch' not deleted (may already be gone or needs -D)"
+  git -C "$REPO_ROOT" worktree remove "$wt_path" --force \
+    || warn "Could not remove worktree at $wt_path (may already be gone)."
 
-  ok "Done. Worktree and branch cleaned up."
+  info "Deleting branch $branch …"
+  git -C "$REPO_ROOT" branch -D "$branch" 2>/dev/null \
+    || warn "Branch '$branch' not deleted (may already be gone)."
+
+  ok "Done — $branch merged into $BASE_BRANCH and worktree cleaned up."
 }
 
 cmd_discard() {
