@@ -25,8 +25,9 @@ ok()   { echo -e "${GRN}✓${RST} $*"; }
 warn() { echo -e "${YLW}⚠${RST}  $*"; }
 
 require_clean_main() {
+  # Ignore untracked files (e.g. .claude/worktrees) — only fail on staged/modified tracked files
   local dirty
-  dirty=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | head -1)
+  dirty=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -v '^??' | head -1)
   [[ -z "$dirty" ]] || die "main repo has uncommitted changes — stash or commit first"
 }
 
