@@ -214,7 +214,8 @@ export const users = pgTable('users', {
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   uniqueIndex('users_tenant_email_uniq').on(t.tenantId, t.email),
-  uniqueIndex('users_phone_uniq').on(t.phoneE164),
+  // Partial index: phone must be globally unique but only when set
+  uniqueIndex('users_phone_uniq').on(t.phoneE164).where(sql`phone_e164 IS NOT NULL`),
   index('users_tenant_idx').on(t.tenantId),
   check('users_role_chk', sql`role IN ('owner','manager','staff')`),
 ]);
@@ -267,7 +268,10 @@ export const workingHours = pgTable('working_hours', {
   openTime:    text('open_time').notNull().default('09:00'),
   closeTime:   text('close_time').notNull().default('20:00'),
 }, t => [
-  uniqueIndex('working_hours_tenant_day_uniq').on(t.tenantId, t.locationId, t.dayOfWeek),
+  // Two partial indexes instead of one UNIQUE — Postgres treats all NULLs as distinct
+  // in a plain UNIQUE constraint, so location_id IS NULL rows would never collide.
+  uniqueIndex('working_hours_tenant_loc_day_uniq').on(t.tenantId, t.locationId, t.dayOfWeek).where(sql`location_id IS NOT NULL`),
+  uniqueIndex('working_hours_tenant_day_null_uniq').on(t.tenantId, t.dayOfWeek).where(sql`location_id IS NULL`),
   index('working_hours_tenant_idx').on(t.tenantId),
   check('working_hours_day_chk', sql`day_of_week BETWEEN 0 AND 6`),
 ]);

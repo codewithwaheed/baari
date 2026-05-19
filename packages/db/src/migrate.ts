@@ -40,13 +40,19 @@ async function ensureDbAndUser(
   const client = new Client(adminConn);
   await client.connect();
 
-  // Create app role
+  // Create app role.
+  // rolePassword is safely quoted via client.escapeLiteral() (pg's built-in SQL escaping) to
+  // prevent injection. roleName is a DB identifier sourced from DATABASE_URL (operator-controlled),
+  // not arbitrary user input, so identifier quoting via "" is sufficient.
+  const safePassword = client.escapeLiteral(rolePassword);
   await client.query(`
     DO $$ BEGIN
-      CREATE ROLE ${roleName} WITH LOGIN PASSWORD '${rolePassword}';
+      CREATE ROLE ${roleName} WITH LOGIN PASSWORD ${safePassword};
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$;
   `);
+  // Ensure password is up-to-date even if the role already existed.
+  await client.query(`ALTER ROLE "${roleName}" PASSWORD ${safePassword}`);
 
   // Create database
   const { rows } = await client.query(
@@ -103,6 +109,27 @@ async function applyMigration(
     await client.query(sql2);
     console.log('✓ Migration 0002 applied.');
   }
+
+  // ── RLS patches (idempotent) ─────────────────────────────────────────────────
+  // Applied on every run to ensure RLS is correct even if 0002_auth.sql ran before
+  // these policies were added.
+  await client.query(`
+    -- refresh_tokens: tenant-scoped via user_id → users.tenant_id
+    ALTER TABLE refresh_tokens ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
+    DO $$ BEGIN
+      CREATE POLICY tenant_isolation ON refresh_tokens FOR ALL TO app_user
+        USING (user_id IN (SELECT id FROM users WHERE tenant_id = current_setting('app.tenant_id', true)::uuid))
+        WITH CHECK (user_id IN (SELECT id FROM users WHERE tenant_id = current_setting('app.tenant_id', true)::uuid));
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+
+    -- otp_log: global (phones are cross-tenant); app_user cannot read/write directly.
+    -- Auth routes use the baari role (BYPASSRLS). No policy = deny all to app_user.
+    ALTER TABLE otp_log ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE otp_log FORCE ROW LEVEL SECURITY;
+  `);
+  console.log('✓ RLS patches applied (refresh_tokens, otp_log).');
 
   // Grant the app role (baari) full access + RLS bypass for local dev / seed scripts.
   // In production the pool connects as app_user which has RLS enforced via withTenant().

@@ -37,6 +37,12 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON refresh_tokens(user_id);
 
+ALTER TABLE refresh_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE refresh_tokens FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON refresh_tokens FOR ALL TO app_user
+  USING (user_id IN (SELECT id FROM users WHERE tenant_id = current_setting('app.tenant_id', true)::uuid))
+  WITH CHECK (user_id IN (SELECT id FROM users WHERE tenant_id = current_setting('app.tenant_id', true)::uuid));
+
 -- ── OTP audit log ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS otp_log (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,6 +51,11 @@ CREATE TABLE IF NOT EXISTS otp_log (
   verified_at TIMESTAMPTZ,
   ip_address  TEXT
 );
+
+-- otp_log is intentionally global (phones are cross-tenant).
+-- No policy for app_user — deny all. Auth routes use the baari role (BYPASSRLS).
+ALTER TABLE otp_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE otp_log FORCE ROW LEVEL SECURITY;
 
 -- ── Team invites ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS team_invites (
@@ -77,11 +88,24 @@ CREATE TABLE IF NOT EXISTS working_hours (
   day_of_week  INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
   is_open      BOOLEAN NOT NULL DEFAULT true,
   open_time    TEXT NOT NULL DEFAULT '09:00',
-  close_time   TEXT NOT NULL DEFAULT '20:00',
-  UNIQUE (tenant_id, location_id, day_of_week)
+  close_time   TEXT NOT NULL DEFAULT '20:00'
+  -- No inline UNIQUE: Postgres treats all NULLs as distinct, so a single
+  -- UNIQUE (tenant_id, location_id, day_of_week) fails to enforce uniqueness
+  -- when location_id IS NULL. Two partial indexes are used instead (see below).
 );
 
 CREATE INDEX IF NOT EXISTS working_hours_tenant_idx ON working_hours(tenant_id);
+
+-- Uniqueness when location_id is set (branch-level working hours)
+CREATE UNIQUE INDEX IF NOT EXISTS working_hours_tenant_loc_day_uniq
+  ON working_hours(tenant_id, location_id, day_of_week)
+  WHERE location_id IS NOT NULL;
+
+-- Uniqueness when location_id is NULL (tenant-level / default working hours)
+-- MVP: most tenants have no locations, so this is the common case.
+CREATE UNIQUE INDEX IF NOT EXISTS working_hours_tenant_day_null_uniq
+  ON working_hours(tenant_id, day_of_week)
+  WHERE location_id IS NULL;
 
 ALTER TABLE working_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE working_hours FORCE ROW LEVEL SECURITY;
