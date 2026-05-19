@@ -26,6 +26,9 @@ info() { echo -e "${BLU}→${RST} $*"; }
 ok()   { echo -e "${GRN}✓${RST} $*"; }
 warn() { echo -e "${YLW}⚠${RST}  $*"; }
 
+# Trap unexpected exits and print last command so failures are never silent
+trap 'echo -e "${RED}error:${RST} script exited unexpectedly (last command: $BASH_COMMAND)" >&2' ERR
+
 require_clean_main() {
   # Ignore untracked files (e.g. .claude/worktrees) — only fail on staged/modified tracked files
   local dirty
