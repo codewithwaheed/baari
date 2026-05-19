@@ -2,11 +2,22 @@
 // Development seed — Pakistani salon, PKR amounts.
 // Run: pnpm db:seed
 
+import { sql } from 'drizzle-orm';
 import { db } from '../client';
 import * as schema from '../schema';
 
 async function seed() {
   console.log('🌱 Seeding database...');
+
+  // Idempotency: skip if already seeded
+  const existing = await db.select({ id: schema.tenants.id })
+    .from(schema.tenants)
+    .where(sql`slug = 'saloni-studio-lahore'`);
+  if (existing.length > 0) {
+    console.log('ℹ️  Seed data already present, skipping.');
+    console.log(`   Tenant ID: ${existing[0]!.id}`);
+    process.exit(0);
+  }
 
   // Tenant
   const [tenant] = await db.insert(schema.tenants).values({

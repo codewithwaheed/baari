@@ -2,7 +2,7 @@
 
 > باری · "Your turn." — WhatsApp-native B2B appointment SaaS for Pakistan.
 
-**Read this file first. Then read `ARCHITECTURE.md`. Then read `packages/db/src/schema.ts`.**
+**Read this file first. Then read `ARCHITECTURE.md`. Then read `PRODUCT.md` for full feature specs. For local dev setup see `DEVELOPMENT.md`. Then read `packages/db/src/schema.ts`.**
 
 ---
 

@@ -10,6 +10,8 @@
     "build": "pnpm --filter @baari/db build && pnpm --filter @baari/types build && pnpm --filter @baari/web build && pnpm --filter @baari/api build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "db:start": "bash scripts/start-db.sh",
+    "db:up": "pnpm db:start && pnpm db:migrate && pnpm db:seed",
     "db:generate": "pnpm --filter @baari/db db:generate",
     "db:migrate": "pnpm --filter @baari/db db:migrate",
     "db:seed": "pnpm --filter @baari/db db:seed",

@@ -6,6 +6,15 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { sql } from 'drizzle-orm';
 import * as schema from './schema';
+import { existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Load .env from monorepo root when running locally (dev scripts, seed, migrate).
+// In production DATABASE_URL is injected by the container runtime — .env won't exist.
+const _dir = dirname(fileURLToPath(import.meta.url));
+const _env = resolve(_dir, '../../../.env');
+if (existsSync(_env)) process.loadEnvFile(_env);
 
 const pool = new Pool({
   connectionString: process.env['DATABASE_URL'],

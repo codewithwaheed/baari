@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx src/migrate.ts",
+    "db:migrate:drizzle": "drizzle-kit migrate",
     "db:seed": "tsx src/seed/index.ts",
     "db:studio": "drizzle-kit studio",
     "build": "tsc --noEmit"
