@@ -87,6 +87,23 @@ async function applyMigration(
     console.log('✓ Migration applied.');
   }
 
+  // ── Apply 0002_auth ──────────────────────────────────────────────────────
+  const { rows: rows2 } = await client.query<{ exists: string | null }>(`
+    SELECT to_regclass('public.refresh_tokens') AS exists
+  `);
+
+  if (rows2[0]?.exists) {
+    console.log('✓ Migration 0002_auth already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0002_auth.sql...');
+    const sql2 = readFileSync(
+      join(__dirname, 'migrations/0002_auth.sql'),
+      'utf-8',
+    );
+    await client.query(sql2);
+    console.log('✓ Migration 0002 applied.');
+  }
+
   // Grant the app role (baari) full access + RLS bypass for local dev / seed scripts.
   // In production the pool connects as app_user which has RLS enforced via withTenant().
   await client.query(`
