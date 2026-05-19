@@ -7,6 +7,7 @@ import type { NavId } from './data';
 interface SidebarProps {
   active: NavId;
   onNavigate: (id: NavId) => void;
+  onLogout: () => void;
   requestsCount?: number;
 }
 
@@ -85,9 +86,10 @@ function NavItem({ id: _id, label, icon, badge, locked, active, onClick }: NavIt
   );
 }
 
-export function Sidebar({ active, onNavigate, requestsCount = 0 }: SidebarProps) {
+export function Sidebar({ active, onNavigate, onLogout, requestsCount = 0 }: SidebarProps) {
   const [settingsHover, setSettingsHover] = useState(false);
   const [billieHover, setBillieHover] = useState(false);
+  const [logoutHover, setLogoutHover] = useState(false);
 
   return (
     <aside style={{
@@ -195,6 +197,25 @@ export function Sidebar({ active, onNavigate, requestsCount = 0 }: SidebarProps)
         >
           <Icon name="settings" size={17} stroke={1.6} />
           <span>Settings</span>
+        </button>
+
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 4px' }} />
+
+        <button
+          onClick={onLogout}
+          onMouseEnter={() => setLogoutHover(true)}
+          onMouseLeave={() => setLogoutHover(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+            background: logoutHover ? 'rgba(220,50,50,0.1)' : 'transparent',
+            color: logoutHover ? '#f87171' : 'rgba(255,255,255,0.4)',
+            border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
+            textAlign: 'left', width: '100%',
+            transition: 'background 120ms ease, color 120ms ease',
+          }}
+        >
+          <Icon name="logout" size={17} stroke={1.6} />
+          <span>Sign out</span>
         </button>
       </div>
     </aside>

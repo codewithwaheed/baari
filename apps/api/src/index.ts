@@ -7,6 +7,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
 
 const app = Fastify({
   logger: {
@@ -30,6 +31,9 @@ async function build() {
     skipOnError: true,
   });
 
+  // ── Cookies ───────────────────────────────────────────────────────────────
+  await app.register(cookie);
+
   // ── Auth ──────────────────────────────────────────────────────────────────
   await app.register(jwt, {
     secret: process.env['JWT_SECRET'] ?? 'dev_secret_replace_in_production',
@@ -45,8 +49,8 @@ async function build() {
   });
 
   // ── Routes ────────────────────────────────────────────────────────────────
-  // TODO: register route modules here as they are built
-  // await app.register(import('./routes/auth'), { prefix: '/api/v1/auth' });
+  await app.register(import('./routes/auth'), { prefix: '/api/v1/auth' });
+  await app.register(import('./routes/me'),   { prefix: '/api/v1/me' });
   // await app.register(import('./routes/bookings'), { prefix: '/api/v1/bookings' });
   // await app.register(import('./routes/staff'), { prefix: '/api/v1/staff' });
   // await app.register(import('./routes/services'), { prefix: '/api/v1/services' });

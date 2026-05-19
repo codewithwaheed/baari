@@ -13,6 +13,18 @@ export const redis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:63
   lazyConnect: true,
 });
 
+// Separate client for auth operations — fails fast (no infinite buffering).
+// maxRetriesPerRequest: 0 causes commands to reject immediately when Redis
+// is unavailable, so OTP/token endpoints return 503 instead of hanging.
+export const authRedis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379', {
+  maxRetriesPerRequest: 0,
+  enableReadyCheck: false,
+  lazyConnect: true,
+  connectTimeout: 2000,
+});
+
+authRedis.on('error', () => { /* handled per-call */ });
+
 redis.on('error', (err) => {
   console.error('[Redis] connection error:', err.message);
 });

@@ -25,24 +25,23 @@ const citext = customType<{ data: string }>({
 // One row per salon business. This is the root of all multi-tenancy.
 
 export const tenants = pgTable('tenants', {
-  id:        uuid('id').primaryKey().defaultRandom(),
-  slug:      citext('slug').notNull().unique(),            // URL-safe: "ruma-lahore"
-  name:      text('name').notNull(),                       // Display: "RUMA Aesthetics"
-  country:   text('country').notNull().default('PK'),
-  timezone:  text('timezone').notNull().default('Asia/Karachi'),
-  plan:      text('plan').notNull().default('free'),       // free | pro | business | enterprise
-  status:    text('status').notNull().default('active'),   // active | suspended | churned
-
-  // WhatsApp Business Account — set during Embedded Signup
-  waPhoneId: text('wa_phone_id').unique(),                 // Meta phone_number_id (routing key)
-  waWabaId:  text('wa_waba_id'),
-  waToken:   text('wa_token'),                             // System User token — ENCRYPT AT REST
-
-  // Onboarding
-  ntn:       text('ntn'),                                  // National Tax Number (SBP KYC)
-
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  slug:               citext('slug').notNull().unique(),
+  name:               text('name').notNull(),
+  country:            text('country').notNull().default('PK'),
+  timezone:           text('timezone').notNull().default('Asia/Karachi'),
+  plan:               text('plan').notNull().default('free'),
+  status:             text('status').notNull().default('active'),
+  city:               text('city'),
+  ownerName:          text('owner_name'),
+  onboardingStep:     integer('onboarding_step').notNull().default(0),
+  onboardingComplete: boolean('onboarding_complete').notNull().default(false),
+  waPhoneId:          text('wa_phone_id').unique(),
+  waWabaId:           text('wa_waba_id'),
+  waToken:            text('wa_token'),
+  ntn:                text('ntn'),
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ─── Locations ────────────────────────────────────────────────────────────────
@@ -200,17 +199,81 @@ export const bookingRequests = pgTable('booking_requests', {
 // Dashboard accounts for salon owners, managers, staff.
 
 export const users = pgTable('users', {
-  id:        uuid('id').primaryKey().defaultRandom(),
-  tenantId:  uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  staffId:   uuid('staff_id').references(() => staff.id), // null for owner/admin users
-  email:     citext('email').notNull(),
-  name:      text('name').notNull(),
-  role:      text('role').notNull().default('staff'),      // owner | manager | staff
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  id:               uuid('id').primaryKey().defaultRandom(),
+  tenantId:         uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  staffId:          uuid('staff_id').references(() => staff.id),
+  email:            citext('email'),
+  name:             text('name').notNull(),
+  role:             text('role').notNull().default('staff'),
+  phoneE164:        text('phone_e164'),
+  passwordHash:     text('password_hash'),
+  phoneVerified:    boolean('phone_verified').notNull().default(false),
+  failedLoginCount: integer('failed_login_count').notNull().default(0),
+  lockedUntil:      timestamp('locked_until', { withTimezone: true }),
+  lastLoginAt:      timestamp('last_login_at', { withTimezone: true }),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   uniqueIndex('users_tenant_email_uniq').on(t.tenantId, t.email),
+  // Partial index: phone must be globally unique but only when set
+  uniqueIndex('users_phone_uniq').on(t.phoneE164).where(sql`phone_e164 IS NOT NULL`),
   index('users_tenant_idx').on(t.tenantId),
   check('users_role_chk', sql`role IN ('owner','manager','staff')`),
+]);
+
+// ─── Refresh Tokens ───────────────────────────────────────────────────────────
+export const refreshTokens = pgTable('refresh_tokens', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token:     text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index('refresh_tokens_user_idx').on(t.userId),
+]);
+
+// ─── OTP Log ─────────────────────────────────────────────────────────────────
+export const otpLog = pgTable('otp_log', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  phone:      text('phone').notNull(),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  ipAddress:  text('ip_address'),
+});
+
+// ─── Team Invites ─────────────────────────────────────────────────────────────
+export const teamInvites = pgTable('team_invites', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  tenantId:   uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  phoneE164:  text('phone_e164').notNull(),
+  role:       text('role').notNull(),
+  staffId:    uuid('staff_id').references(() => staff.id),
+  token:      text('token').notNull().unique(),
+  invitedBy:  uuid('invited_by').notNull().references(() => users.id),
+  expiresAt:  timestamp('expires_at', { withTimezone: true }).notNull(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index('team_invites_token_idx').on(t.token),
+  index('team_invites_tenant_idx').on(t.tenantId),
+  check('team_invites_role_chk', sql`role IN ('manager','staff')`),
+]);
+
+// ─── Working Hours ────────────────────────────────────────────────────────────
+export const workingHours = pgTable('working_hours', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  tenantId:    uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  locationId:  uuid('location_id').references(() => locations.id),
+  dayOfWeek:   integer('day_of_week').notNull(),
+  isOpen:      boolean('is_open').notNull().default(true),
+  openTime:    text('open_time').notNull().default('09:00'),
+  closeTime:   text('close_time').notNull().default('20:00'),
+}, t => [
+  // Two partial indexes instead of one UNIQUE — Postgres treats all NULLs as distinct
+  // in a plain UNIQUE constraint, so location_id IS NULL rows would never collide.
+  uniqueIndex('working_hours_tenant_loc_day_uniq').on(t.tenantId, t.locationId, t.dayOfWeek).where(sql`location_id IS NOT NULL`),
+  uniqueIndex('working_hours_tenant_day_null_uniq').on(t.tenantId, t.dayOfWeek).where(sql`location_id IS NULL`),
+  index('working_hours_tenant_idx').on(t.tenantId),
+  check('working_hours_day_chk', sql`day_of_week BETWEEN 0 AND 6`),
 ]);
 
 // ─── Type exports ─────────────────────────────────────────────────────────────
@@ -225,6 +288,10 @@ export type Booking        = typeof bookings.$inferSelect;
 export type Payment        = typeof payments.$inferSelect;
 export type BookingRequest = typeof bookingRequests.$inferSelect;
 export type User           = typeof users.$inferSelect;
+export type RefreshToken   = typeof refreshTokens.$inferSelect;
+export type OtpLog         = typeof otpLog.$inferSelect;
+export type TeamInvite     = typeof teamInvites.$inferSelect;
+export type WorkingHours   = typeof workingHours.$inferSelect;
 
 export type BookingState   = 'INITIATED' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
 export type BookingSource  = 'manual' | 'whatsapp' | 'web';
