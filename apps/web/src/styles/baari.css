@@ -494,3 +494,16 @@ html, body {
   display: flex; flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* ─── Staff pill row ───────────────────────────────────────────────────────── */
+.staff-pill-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid var(--border-subtle);
+  scrollbar-width: none;
+}
+.staff-pill-row::-webkit-scrollbar { display: none; }
