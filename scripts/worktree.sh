@@ -30,9 +30,11 @@ warn() { echo -e "${YLW}⚠${RST}  $*"; }
 trap 'echo -e "${RED}error:${RST} script exited unexpectedly (last command: $BASH_COMMAND)" >&2' ERR
 
 require_clean_main() {
-  # Ignore untracked files (e.g. .claude/worktrees) — only fail on staged/modified tracked files
+  # Ignore untracked files (e.g. .claude/worktrees) — only fail on staged/modified tracked files.
+  # The `|| true` absorbs grep's exit-1 when there are zero matching lines (clean tree),
+  # which would otherwise kill the script under set -eo pipefail.
   local dirty
-  dirty=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -v '^??' | head -1)
+  dirty=$(git -C "$REPO_ROOT" status --porcelain 2>/dev/null | grep -v '^??' | head -1 || true)
   [[ -z "$dirty" ]] || die "main repo has uncommitted changes — stash or commit first"
 }
 
