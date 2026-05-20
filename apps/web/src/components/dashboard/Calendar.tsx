@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, fmtTime } from './primitives';
 import { AppointmentCard, APPT_PALETTES } from './AppointmentCard';
 import type { DragStartPayload } from './AppointmentCard';
+import { StaffPillRow } from './StaffPillRow';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { STAFF } from './data';
-import type { Appointment } from './data';
+import type { Appointment, Staff } from './data';
 
 const HOUR_PX    = 76;
 const START_HOUR = 8;
@@ -37,9 +39,11 @@ interface CalendarProps {
   selectedId?: string | null;
   onSelect?: (a: Appointment) => void;
   onMove?: (apptId: string, newStart: number, newEnd: number) => void;
+  activeStaffId?: string;
+  onStaffChange?: (id: string) => void;
 }
 
-export function Calendar({ appts, selectedId, onSelect, onMove }: CalendarProps) {
+export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, onStaffChange }: CalendarProps) {
   // Live "now" line
   const [nowHour, setNowHour] = useState(() => {
     const n = new Date();
@@ -119,6 +123,85 @@ export function Calendar({ appts, selectedId, onSelect, onMove }: CalendarProps)
   };
 
   const showNow = nowHour >= START_HOUR && nowHour <= END_HOUR;
+
+  const isMobile = useIsMobile();
+  const activeStaff: Staff = STAFF.find(s => s.id === activeStaffId) ?? STAFF[0]!;
+  const mobileAppts = appts.filter(a => a.staff === activeStaff.id);
+
+  if (isMobile) {
+    return (
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', fontFamily: 'var(--font-body)' }}>
+        <StaffPillRow
+          staff={STAFF}
+          activeId={activeStaff.id}
+          onChange={id => onStaffChange?.(id)}
+        />
+        <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `${TIME_GUTTER}px 1fr`,
+            minHeight: (END_HOUR - START_HOUR) * HOUR_PX,
+            position: 'relative',
+          }}>
+            {/* Time gutter */}
+            <div style={{ borderRight: '1px solid var(--border-subtle)' }}>
+              {HOURS.map(h => (
+                <div key={h} style={{
+                  height: HOUR_PX, paddingRight: 10, paddingTop: 4,
+                  textAlign: 'right', fontSize: 11, color: 'var(--fg-muted)', letterSpacing: '0.04em',
+                }}>
+                  {fmtTime(h)}
+                </div>
+              ))}
+            </div>
+            {/* Single staff column */}
+            <div style={{ position: 'relative', background: '#fff' }}>
+              {HOURS.map((h, i) => (
+                <div key={h} style={{
+                  position: 'absolute', top: i * HOUR_PX, left: 0, right: 0, height: HOUR_PX,
+                  borderBottom: i < HOURS.length - 1 ? '1px solid var(--border-subtle)' : undefined,
+                }} />
+              ))}
+              {mobileAppts.map(a => (
+                <AppointmentCard
+                  key={a.id}
+                  appt={a}
+                  top={toY(a.start)}
+                  height={(a.end - a.start) * HOUR_PX}
+                  selected={selectedId === a.id}
+                  isDragging={false}
+                  onClick={() => onSelect?.(a)}
+                  onDragStart={() => {}}
+                />
+              ))}
+              {mobileAppts.length === 0 && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'var(--fg-muted)', fontSize: 13,
+                }}>
+                  No appointments today
+                </div>
+              )}
+            </div>
+            {/* Now line */}
+            {showNow && (
+              <div style={{
+                position: 'absolute', top: toY(nowHour), left: TIME_GUTTER, right: 0,
+                borderTop: '2px solid var(--baari-lime)', pointerEvents: 'none', zIndex: 4,
+              }}>
+                <div style={{
+                  position: 'absolute', left: -6, top: -6, width: 10, height: 10,
+                  borderRadius: 999, background: 'var(--baari-lime)',
+                  boxShadow: '0 0 0 4px rgba(232, 255, 71, 0.18)',
+                }} />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
