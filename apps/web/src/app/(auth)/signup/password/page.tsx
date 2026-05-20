@@ -49,7 +49,8 @@ export default function SignupPasswordPage() {
       }
 
       sessionStorage.removeItem('baari_signup_phone');
-      router.push('/dashboard');
+      // New users always start onboarding from step 1
+      router.push('/onboarding/salon');
     } catch {
       setError('Connection error. Try again.');
     } finally {

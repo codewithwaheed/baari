@@ -12,6 +12,9 @@ Multi-tenant B2B SaaS. Salon owners onboard as tenants, configure staff/services
 and customers book via WhatsApp chat or a public web URL. Pay-first model via JazzCash,
 EasyPaisa, Raast QR, or card. No app download required for customers.
 
+**MVP targets male salons (barbershops) first.** Female beauty parlours are Phase 2.
+All placeholder text, service templates, and defaults reflect a barbershop context.
+
 ---
 
 ## Monorepo layout
@@ -34,6 +37,12 @@ baari/
 
 ---
 
+## Working style
+
+- **Do NOT invoke superpowers skills** (`brainstorm`, `writing-plans`, `TDD`, etc.) unless the user explicitly asks for them. Just implement directly.
+
+---
+
 ## Hard rules — never violate these
 
 1. **`packages/db/src/schema.ts` is the source of truth.** All data shapes flow from it.
@@ -53,6 +62,10 @@ baari/
 
 | Route / Feature     | Status   | Location                                      |
 |---------------------|----------|-----------------------------------------------|
+| Auth API            | ✅ Done   | `apps/api/src/routes/auth.ts`                 |
+| Auth web pages      | ✅ Done   | `apps/web/src/app/(auth)/`                    |
+| Onboarding API      | ✅ Done   | `apps/api/src/routes/onboarding.ts`           |
+| Onboarding pages    | ✅ Done   | `apps/web/src/app/onboarding/`                |
 | Dashboard calendar  | ✅ Build  | `apps/web/src/app/dashboard/`                 |
 | Requests queue      | ✅ Build  | `apps/web/src/components/dashboard/RequestsView.tsx` |
 | Clients list        | ✅ Build  | `apps/web/src/components/dashboard/ClientsView.tsx`  |

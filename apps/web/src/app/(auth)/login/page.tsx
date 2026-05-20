@@ -41,7 +41,13 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/dashboard');
+      // Redirect based on onboarding state
+      if (!data.onboarding?.complete) {
+        const stepRoutes = ['/onboarding/salon', '/onboarding/services', '/onboarding/hours'];
+        router.push(stepRoutes[data.onboarding?.step ?? 0] ?? '/onboarding/salon');
+      } else {
+        router.push('/dashboard');
+      }
     } catch {
       setError('Connection error. Check your internet and try again.');
     } finally {
