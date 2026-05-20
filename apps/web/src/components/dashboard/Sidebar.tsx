@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Icon } from './primitives';
+import { Icon, Avatar } from './primitives';
 import type { NavId } from './data';
 
 interface SidebarProps {
@@ -9,38 +9,26 @@ interface SidebarProps {
   onNavigate: (id: NavId) => void;
   onLogout: () => void;
   requestsCount?: number;
+  userName?: string;
+  userRole?: string;
+  tenantName?: string;
+  tenantCity?: string;
 }
 
-const NAV_SECTIONS = [
-  {
-    label: 'Bookings',
-    items: [
-      { id: 'calendar' as NavId, label: 'Calendar', icon: 'calendar' as const },
-      { id: 'requests' as NavId, label: 'Requests', icon: 'inbox' as const, badge: true },
-      { id: 'waitlist' as NavId, label: 'Waitlist', icon: 'users' as const, locked: true },
-    ],
-  },
-  {
-    label: 'Clients',
-    items: [
-      { id: 'clients'  as NavId, label: 'Clients',  icon: 'user' as const },
-      { id: 'messages' as NavId, label: 'Messages', icon: 'message' as const, locked: true },
-    ],
-  },
-  {
-    label: 'Sales',
-    items: [
-      { id: 'inventory' as NavId, label: 'Inventory', icon: 'package' as const, locked: true },
-    ],
-  },
-  {
-    label: 'Grow',
-    items: [
-      { id: 'marketing' as NavId, label: 'Marketing', icon: 'sparkles' as const, locked: true },
-      { id: 'reports'   as NavId, label: 'Reports',   icon: 'chart' as const,    locked: true },
-    ],
-  },
-] as const;
+const MAIN_NAV: { id: NavId; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { id: 'calendar', label: 'Calendar',  icon: 'calendar' },
+  { id: 'requests', label: 'Requests',  icon: 'inbox'    },
+  { id: 'clients',  label: 'Clients',   icon: 'user'     },
+  { id: 'pos',      label: 'POS',       icon: 'pos'      },
+  { id: 'settings', label: 'Settings',  icon: 'settings' },
+];
+
+const LOCKED_NAV: { id: NavId; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+  { id: 'inventory', label: 'Inventory', icon: 'package'  },
+  { id: 'marketing', label: 'Marketing', icon: 'sparkles' },
+  { id: 'reports',   label: 'Reports',   icon: 'chart'    },
+  { id: 'billie',    label: 'Ask Billie',icon: 'sparkles' },
+];
 
 interface NavItemProps {
   id: NavId;
@@ -52,7 +40,7 @@ interface NavItemProps {
   onClick: () => void;
 }
 
-function NavItem({ id: _id, label, icon, badge, locked, active, onClick }: NavItemProps) {
+function NavItem({ label, icon, badge, locked, active, onClick }: NavItemProps) {
   const [hover, setHover] = useState(false);
   return (
     <button
@@ -61,15 +49,15 @@ function NavItem({ id: _id, label, icon, badge, locked, active, onClick }: NavIt
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '8px 12px',
+        padding: '9px 12px',
         background: active
-          ? 'rgba(232, 255, 71, 0.14)'
+          ? 'rgba(232,255,71,0.14)'
           : hover ? 'rgba(255,255,255,0.04)' : 'transparent',
-        color: active ? 'var(--baari-lime)' : 'rgba(255,255,255,0.75)',
+        color: active ? 'var(--baari-lime)' : locked ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.75)',
         border: 0, borderRadius: 6, cursor: 'pointer',
         textAlign: 'left', fontFamily: 'var(--font-body)', fontSize: 14, fontWeight: 500,
         transition: 'background 120ms ease, color 120ms ease',
-        opacity: locked ? 0.6 : 1, width: '100%',
+        width: '100%',
       }}
     >
       <Icon name={icon} size={17} stroke={1.6} />
@@ -77,146 +65,141 @@ function NavItem({ id: _id, label, icon, badge, locked, active, onClick }: NavIt
       {badge ? (
         <span style={{
           background: 'var(--baari-lime)', color: 'var(--baari-onyx)',
-          fontSize: 10, fontWeight: 600, padding: '1px 6px',
+          fontSize: 10, fontWeight: 700, padding: '1px 6px',
           borderRadius: 999, minWidth: 18, textAlign: 'center',
         }}>{badge}</span>
       ) : null}
-      {locked && <Icon name="lock" size={12} color="rgba(255,255,255,0.4)" stroke={1.6} />}
+      {locked && <Icon name="lock" size={12} color="rgba(255,255,255,0.3)" stroke={1.6} />}
     </button>
   );
 }
 
-export function Sidebar({ active, onNavigate, onLogout, requestsCount = 0 }: SidebarProps) {
-  const [settingsHover, setSettingsHover] = useState(false);
-  const [billieHover, setBillieHover] = useState(false);
+export function Sidebar({
+  active, onNavigate, onLogout,
+  requestsCount = 0,
+  userName = 'Owner',
+  userRole = 'owner',
+  tenantName = 'My Salon',
+  tenantCity,
+}: SidebarProps) {
   const [logoutHover, setLogoutHover] = useState(false);
 
   return (
-    <aside style={{
-      width: 224, flexShrink: 0,
-      background: 'var(--baari-onyx)',
-      color: 'rgba(255,255,255,0.8)',
-      borderRight: '1px solid #1b1815',
-      display: 'flex', flexDirection: 'column',
-      fontFamily: 'var(--font-body)',
-    }}>
+    <aside
+      className="dashboard-sidebar"
+      style={{
+        width: 220, flexShrink: 0,
+        background: 'var(--baari-onyx)',
+        borderRight: '1px solid #1a1815',
+        display: 'flex', flexDirection: 'column',
+        fontFamily: 'var(--font-body)',
+      }}
+    >
       {/* Brand */}
-      <div style={{ padding: '22px 22px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ padding: '20px 20px 18px', display: 'flex', alignItems: 'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/assets/logo-lime.svg" alt="Baari" style={{ height: 28 }} />
+        <img src="/assets/logo-lime.svg" alt="Baari" style={{ height: 26 }} />
       </div>
 
-      {/* Location switcher — locked for single-location MVP */}
+      {/* Salon identity chip */}
       <div style={{
-        margin: '0 14px 18px',
+        margin: '0 12px 16px',
         padding: '10px 12px',
-        background: 'rgba(255,255,255,0.04)',
+        background: 'rgba(255,255,255,0.05)',
         border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 6, color: '#fff',
+        borderRadius: 6,
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
+        {/* Baari B monogram — placeholder until salon uploads their own logo */}
         <div style={{
-          width: 26, height: 26, borderRadius: 4, background: 'var(--baari-lime)',
-          color: 'var(--baari-onyx)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 600, fontSize: 14,
-          flexShrink: 0,
-        }}>S</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            Saloni Studio
-          </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Lahore · DHA Phase 5</div>
+          width: 32, height: 32, borderRadius: 6,
+          background: 'var(--baari-onyx)',
+          border: '1.5px solid rgba(232,255,71,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, overflow: 'hidden',
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic', fontWeight: 700,
+            fontSize: 18, lineHeight: 1,
+            color: 'var(--baari-lime)',
+            letterSpacing: '-0.03em',
+            userSelect: 'none',
+          }}>B</span>
         </div>
-        <Icon name="lock" size={12} color="rgba(255,255,255,0.35)" stroke={1.6} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {tenantName || 'My Salon'}
+          </div>
+          {tenantCity && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{tenantCity}</div>
+          )}
+        </div>
       </div>
 
-      {/* Nav sections */}
-      <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 18, overflow: 'auto' }}>
-        {NAV_SECTIONS.map(sec => (
-          <div key={sec.label}>
-            <div style={{
-              fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.16em',
-              color: 'rgba(255,255,255,0.35)', fontWeight: 500,
-              padding: '4px 12px 8px',
-            }}>{sec.label}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {sec.items.map(item => (
-                <NavItem
-                  key={item.id}
-                  id={item.id}
-                  label={item.label}
-                  icon={item.icon}
-                  badge={'badge' in item && item.badge && requestsCount > 0 ? requestsCount : null}
-                  locked={'locked' in item ? item.locked : false}
-                  active={item.id === active}
-                  onClick={() => onNavigate(item.id)}
-                />
-              ))}
-            </div>
-          </div>
+      {/* Main nav */}
+      <nav style={{ flex: 1, padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto' }}>
+        {MAIN_NAV.map(item => (
+          <NavItem
+            key={item.id}
+            id={item.id}
+            label={item.label}
+            icon={item.icon}
+            badge={item.id === 'requests' && requestsCount > 0 ? requestsCount : null}
+            active={item.id === active}
+            onClick={() => onNavigate(item.id)}
+          />
+        ))}
+
+        {/* Divider */}
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '8px 4px' }} />
+
+        {/* Locked items */}
+        {LOCKED_NAV.map(item => (
+          <NavItem
+            key={item.id}
+            id={item.id}
+            label={item.label}
+            icon={item.icon}
+            locked
+            active={item.id === active}
+            onClick={() => onNavigate(item.id)}
+          />
         ))}
       </nav>
 
-      {/* Bottom — Billie (locked) + Settings */}
+      {/* User row + logout */}
       <div style={{
-        padding: '12px 8px 16px',
+        padding: '12px 12px 16px',
         borderTop: '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', flexDirection: 'column', gap: 2,
+        display: 'flex', flexDirection: 'column', gap: 0,
       }}>
-        <button
-          onClick={() => onNavigate('billie')}
-          onMouseEnter={() => setBillieHover(true)}
-          onMouseLeave={() => setBillieHover(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
-            background: billieHover ? 'rgba(255,255,255,0.04)' : 'transparent',
-            color: 'rgba(255,255,255,0.55)',
-            border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
-            textAlign: 'left', width: '100%',
-            transition: 'background 120ms ease',
-          }}
-        >
-          <Icon name="sparkles" size={17} stroke={1.6} color="var(--baari-lime)" />
-          <span style={{ flex: 1 }}>Ask Billie</span>
-          <Icon name="lock" size={12} color="rgba(255,255,255,0.4)" stroke={1.6} />
-        </button>
-        <button
-          onClick={() => onNavigate('settings')}
-          onMouseEnter={() => setSettingsHover(true)}
-          onMouseLeave={() => setSettingsHover(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
-            background: active === 'settings'
-              ? 'rgba(255,255,255,0.08)'
-              : settingsHover ? 'rgba(255,255,255,0.04)' : 'transparent',
-            color: active === 'settings' ? '#fff' : 'rgba(255,255,255,0.6)',
-            border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
-            textAlign: 'left', width: '100%',
-            transition: 'background 120ms ease',
-          }}
-        >
-          <Icon name="settings" size={17} stroke={1.6} />
-          <span>Settings</span>
-        </button>
-
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '6px 4px' }} />
-
-        <button
-          onClick={onLogout}
-          onMouseEnter={() => setLogoutHover(true)}
-          onMouseLeave={() => setLogoutHover(false)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
-            background: logoutHover ? 'rgba(220,50,50,0.1)' : 'transparent',
-            color: logoutHover ? '#f87171' : 'rgba(255,255,255,0.4)',
-            border: 0, borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
-            textAlign: 'left', width: '100%',
-            transition: 'background 120ms ease, color 120ms ease',
-          }}
-        >
-          <Icon name="logout" size={17} stroke={1.6} />
-          <span>Sign out</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px' }}>
+          <Avatar name={userName} size={30} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {userName}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', textTransform: 'capitalize' }}>
+              {userRole}
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            onMouseEnter={() => setLogoutHover(true)}
+            onMouseLeave={() => setLogoutHover(false)}
+            title="Sign out"
+            style={{
+              background: logoutHover ? 'rgba(220,50,50,0.15)' : 'transparent',
+              border: 0, borderRadius: 6, padding: 6, cursor: 'pointer',
+              color: logoutHover ? '#f87171' : 'rgba(255,255,255,0.3)',
+              transition: 'all 120ms ease',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <Icon name="logout" size={16} stroke={1.6} />
+          </button>
+        </div>
       </div>
     </aside>
   );

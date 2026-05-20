@@ -444,3 +444,86 @@ html, body {
   background: var(--baari-lime);
   color: var(--baari-onyx);
 }
+
+/* ─── Dashboard responsive layout ──────────────────────────────────────── */
+/* Sidebar is flex on desktop, hidden on mobile */
+.dashboard-sidebar { /* display controlled by inline style on desktop */ }
+
+/* BottomNav hidden on desktop, flex on mobile */
+.dashboard-bottom-nav { display: none; }
+
+/* Topbar elements hidden on mobile */
+.topbar-search       { }
+.topbar-new-btn      { }
+.topbar-fab          { display: none; }
+
+@media (max-width: 767px) {
+  .dashboard-sidebar  { display: none !important; }
+  .dashboard-bottom-nav { display: flex !important; }
+  .topbar-search      { display: none !important; }
+  .topbar-new-btn     { display: none !important; }
+  .topbar-fab         { display: flex !important; }
+}
+
+/* On mobile, calendar content fills full width without right panel */
+@media (max-width: 767px) {
+  .calendar-right-panel { display: none !important; }
+}
+
+/* ─── Bottom sheet ─────────────────────────────────────────────────────────── */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.bottom-sheet-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(13,13,13,0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.bottom-sheet-panel {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 88%;
+  background: var(--baari-cream);
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  animation: sheet-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── Staff pill row ───────────────────────────────────────────────────────── */
+.staff-pill-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid var(--border-subtle);
+  scrollbar-width: none;
+}
+.staff-pill-row::-webkit-scrollbar { display: none; }
+
+/* ─── Topbar compact mobile ────────────────────────────────────────────────── */
+.topbar-user-name  { }
+.topbar-avatar-sm  { display: none; }
+
+@media (max-width: 767px) {
+  .topbar-user-name  { display: none !important; }
+  .topbar-avatar-sm  { display: flex !important; }
+
+  header { height: 44px !important; min-height: 44px !important; }
+
+  .topbar-title {
+    font-size: 15px !important;
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .topbar-date-label { display: none !important; }
+}

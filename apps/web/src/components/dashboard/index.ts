@@ -4,7 +4,10 @@ export { Icon, DButton, StatusBadge, Avatar, IconButton, Eyebrow, Pill, fmtPKR, 
 export type { BookingStatus } from './primitives';
 
 export { Sidebar } from './Sidebar';
+export { BottomNav } from './BottomNav';
 export { Topbar } from './Topbar';
+export { BottomSheet } from './BottomSheet';
+export { StaffPillRow } from './StaffPillRow';
 export { AppointmentCard } from './AppointmentCard';
 export { Calendar } from './Calendar';
 export { AppointmentPanel, AppointmentPanelEmpty } from './AppointmentPanel';

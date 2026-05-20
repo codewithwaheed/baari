@@ -6,7 +6,7 @@
 import type { BookingStatus } from './primitives';
 
 export type NavId =
-  | 'calendar' | 'requests' | 'clients' | 'settings'
+  | 'calendar' | 'requests' | 'clients' | 'pos' | 'settings'
   | 'waitlist' | 'messages' | 'inventory' | 'marketing' | 'reports' | 'billie';
 
 export interface Staff {

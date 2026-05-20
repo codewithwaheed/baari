@@ -53,7 +53,7 @@ type IconName =
   | 'sparkles' | 'inbox' | 'package' | 'scissors' | 'moreH'
   | 'clock' | 'phone' | 'edit' | 'star' | 'lock' | 'whatsapp'
   | 'qr' | 'cash' | 'wallet' | 'home' | 'approve' | 'decline'
-  | 'logout';
+  | 'logout' | 'pos';
 
 const PATHS: Record<IconName, React.ReactNode> = {
   calendar:  <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
@@ -90,6 +90,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   approve:   <><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></>,
   decline:   <><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></>,
   logout:    <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+  pos:       <><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></>,
 };
 
 interface IconProps {
