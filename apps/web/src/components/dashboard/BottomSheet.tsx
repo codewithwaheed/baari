@@ -21,6 +21,13 @@ export function BottomSheet({ open, onClose, children }: BottomSheetProps) {
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -35,6 +42,8 @@ export function BottomSheet({ open, onClose, children }: BottomSheetProps) {
   return (
     <div
       className="bottom-sheet-overlay"
+      role="dialog"
+      aria-modal="true"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
