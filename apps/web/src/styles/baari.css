@@ -444,3 +444,28 @@ html, body {
   background: var(--baari-lime);
   color: var(--baari-onyx);
 }
+
+/* ─── Dashboard responsive layout ──────────────────────────────────────── */
+/* Sidebar is flex on desktop, hidden on mobile */
+.dashboard-sidebar { /* display controlled by inline style on desktop */ }
+
+/* BottomNav hidden on desktop, flex on mobile */
+.dashboard-bottom-nav { display: none; }
+
+/* Topbar elements hidden on mobile */
+.topbar-search       { }
+.topbar-new-btn      { }
+.topbar-fab          { display: none; }
+
+@media (max-width: 767px) {
+  .dashboard-sidebar  { display: none !important; }
+  .dashboard-bottom-nav { display: flex !important; }
+  .topbar-search      { display: none !important; }
+  .topbar-new-btn     { display: none !important; }
+  .topbar-fab         { display: flex !important; }
+}
+
+/* On mobile, calendar content fills full width without right panel */
+@media (max-width: 767px) {
+  .calendar-right-panel { display: none !important; }
+}
