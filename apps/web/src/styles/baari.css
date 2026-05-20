@@ -507,3 +507,23 @@ html, body {
   scrollbar-width: none;
 }
 .staff-pill-row::-webkit-scrollbar { display: none; }
+
+/* ─── Topbar compact mobile ────────────────────────────────────────────────── */
+.topbar-user-name  { }
+.topbar-avatar-sm  { display: none; }
+
+@media (max-width: 767px) {
+  .topbar-user-name  { display: none !important; }
+  .topbar-avatar-sm  { display: flex !important; }
+
+  header { height: 44px !important; min-height: 44px !important; }
+
+  .topbar-title {
+    font-size: 15px !important;
+    font-family: var(--font-body) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .topbar-date-label { display: none !important; }
+}
