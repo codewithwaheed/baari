@@ -6,6 +6,7 @@ export type { BookingStatus } from './primitives';
 export { Sidebar } from './Sidebar';
 export { BottomNav } from './BottomNav';
 export { Topbar } from './Topbar';
+export { BottomSheet } from './BottomSheet';
 export { AppointmentCard } from './AppointmentCard';
 export { Calendar } from './Calendar';
 export { AppointmentPanel, AppointmentPanelEmpty } from './AppointmentPanel';
