@@ -12,7 +12,7 @@
 
 import {
   pgTable, uuid, text, boolean, integer, bigint,
-  timestamp, uniqueIndex, index, check, customType,
+  timestamp, uniqueIndex, index, check, customType, jsonb,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -267,6 +267,7 @@ export const workingHours = pgTable('working_hours', {
   isOpen:      boolean('is_open').notNull().default(true),
   openTime:    text('open_time').notNull().default('09:00'),
   closeTime:   text('close_time').notNull().default('20:00'),
+  breaks:      jsonb('breaks').$type<Array<{ from: string; to: string }>>().notNull().default([]),
 }, t => [
   // Two partial indexes instead of one UNIQUE — Postgres treats all NULLs as distinct
   // in a plain UNIQUE constraint, so location_id IS NULL rows would never collide.

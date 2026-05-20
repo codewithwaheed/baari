@@ -50,7 +50,11 @@ Baari is a B2B SaaS platform that gives every salon a digital front desk, operat
 
 For the salon owner, Baari provides a **mobile-first management dashboard**: live calendar, staff scheduling, one-tap POS checkout, and a queue of incoming WhatsApp booking requests. The entire system is designed to be operated from a smartphone.
 
-### 1.3 Target Users
+### 1.3 MVP Target Segment
+
+> 🪒 **MVP targets male salons (barbershops) first.** The initial launch focuses on gents' salons — barbershops, hair salons for men — in Tier-1 Pakistani cities. Female beauty parlours and mixed-gender salons are a Phase 2 expansion. All placeholder text, default service templates, onboarding copy, and example data reflect this barbershop-first focus (e.g., "Hassan's Barbershop", Barber service category listed first, default hours 9am–9pm Mon–Sat).
+
+### 1.4 Target Users
 
 | User                | Who They Are                                                                | Primary Device                          |
 | ------------------- | --------------------------------------------------------------------------- | --------------------------------------- |
@@ -59,7 +63,7 @@ For the salon owner, Baari provides a **mobile-first management dashboard**: liv
 | **Receptionist**    | Approves WhatsApp requests. Manages walk-ins. Handles checkout.             | Mobile or desktop                       |
 | **End Customer**    | Messages the salon on WhatsApp. Books and pays. Receives reminders.         | Mobile (WhatsApp only — no app install) |
 
-### 1.4 Mobile-First Design Principles
+### 1.5 Mobile-First Design Principles
 
 > 📱 **The majority of Baari users — owners, staff, and receptionists — will use the dashboard primarily on mobile. Every feature must be designed mobile-first. Desktop is a secondary target.**
 

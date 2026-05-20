@@ -11,7 +11,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Redirect unauthenticated users away from protected pages
-  if (!token && pathname.startsWith('/dashboard')) {
+  if (!token && (pathname.startsWith('/dashboard') || pathname.startsWith('/onboarding'))) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
@@ -21,10 +21,11 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Explicit list — avoids ambiguity with :path* matching bare /dashboard
   matcher: [
     '/dashboard',
     '/dashboard/:path*',
+    '/onboarding',
+    '/onboarding/:path*',
     '/login',
     '/login/:path*',
     '/signup',

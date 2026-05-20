@@ -41,7 +41,7 @@ export default function SignupPage() {
       const data = await res.json();
 
       if (res.status === 409) {
-        setError('An account with this number already exists.');
+        setError('already_exists');
         return;
       }
       if (!res.ok) {
@@ -60,13 +60,28 @@ export default function SignupPage() {
 
   return (
     <AuthCard
-      title="Register your barbershop"
-      subtitle="Onboard your business on Baari — enter your mobile number to get started."
+      title="Register your salon"
+      subtitle="Enter your mobile number — we'll send a one-time code to verify it."
     >
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <PhoneInput value={phone} onChange={setPhone} error={error} disabled={loading} />
+        <PhoneInput value={phone} onChange={setPhone} disabled={loading} />
 
-        {error && (
+        {error === 'already_exists' ? (
+          <div style={{
+            padding: '12px 14px',
+            background: '#FDF2F1',
+            border: '1px solid #F5D0CD',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--fs-body-sm)',
+            color: 'var(--baari-error)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            This number is already registered.{' '}
+            <a href="/login" style={{ color: 'var(--baari-error)', fontWeight: 'var(--fw-medium)' }}>
+              Sign in instead →
+            </a>
+          </div>
+        ) : error ? (
           <div style={{
             padding: '10px 12px',
             background: '#FDF2F1',
@@ -78,7 +93,7 @@ export default function SignupPage() {
           }}>
             {error}
           </div>
-        )}
+        ) : null}
 
         <button
           type="submit"

@@ -37,6 +37,11 @@ async function build() {
   // ── Auth ──────────────────────────────────────────────────────────────────
   await app.register(jwt, {
     secret: process.env['JWT_SECRET'] ?? 'dev_secret_replace_in_production',
+    // Accept token from httpOnly cookie (browsers send cookies, not Authorization headers)
+    cookie: {
+      cookieName: 'baari_token',
+      signed: false,
+    },
   });
 
   // ── Auth middleware ───────────────────────────────────────────────────────
@@ -49,8 +54,9 @@ async function build() {
   });
 
   // ── Routes ────────────────────────────────────────────────────────────────
-  await app.register(import('./routes/auth'), { prefix: '/api/v1/auth' });
-  await app.register(import('./routes/me'),   { prefix: '/api/v1/me' });
+  await app.register(import('./routes/auth'),        { prefix: '/api/v1/auth' });
+  await app.register(import('./routes/me'),          { prefix: '/api/v1/me' });
+  await app.register(import('./routes/onboarding'),  { prefix: '/api/v1/onboarding' });
   // await app.register(import('./routes/bookings'), { prefix: '/api/v1/bookings' });
   // await app.register(import('./routes/staff'), { prefix: '/api/v1/staff' });
   // await app.register(import('./routes/services'), { prefix: '/api/v1/services' });

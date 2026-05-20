@@ -181,9 +181,10 @@ export default async function authRoutes(app: FastifyInstance) {
 
     await resetLoginAttempts(user.id);
 
-    const locations = await db.query.locations.findMany({
-      where: eq(schema.locations.tenantId, user.tenantId),
-    });
+    const [locations, tenant] = await Promise.all([
+      db.query.locations.findMany({ where: eq(schema.locations.tenantId, user.tenantId) }),
+      db.query.tenants.findFirst({ where: eq(schema.tenants.id, user.tenantId) }),
+    ]);
 
     const jwtPayload: Omit<JWTPayload, 'iat' | 'exp'> = {
       sub:  user.id,
@@ -197,7 +198,14 @@ export default async function authRoutes(app: FastifyInstance) {
     const refreshToken = await createRefreshToken(user.id, redis);
     setCookies(reply, jwt, refreshToken);
 
-    return reply.send({ ok: true, user: { id: user.id, name: user.name, role: user.role, tenantId: user.tenantId } });
+    return reply.send({
+      ok: true,
+      user: { id: user.id, name: user.name, role: user.role, tenantId: user.tenantId },
+      onboarding: {
+        complete: tenant?.onboardingComplete ?? false,
+        step:     tenant?.onboardingStep     ?? 0,
+      },
+    });
   });
 
   // ── POST /auth/forgot-password ───────────────────────────────────────────
