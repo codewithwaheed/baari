@@ -69,7 +69,7 @@ export function BottomNav({ active, onNavigate, onNew, requestsCount = 0 }: Bott
         height: 64,
         background: 'var(--baari-onyx)',
         borderTop: '1px solid #1a1815',
-        display: 'flex', alignItems: 'stretch',
+        alignItems: 'stretch',
         fontFamily: 'var(--font-body)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         position: 'relative',

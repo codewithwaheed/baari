@@ -113,9 +113,9 @@ export default function DashboardPage() {
         onNavigate={navigate}
         onLogout={handleLogout}
         requestsCount={requests.length}
-        userName={user.name}
+        userName={user.name || 'Owner'}
         userRole={user.role}
-        tenantName={user.tenantName}
+        tenantName={user.tenantName || 'My Salon'}
         tenantCity={user.tenantCity}
       />
 
@@ -127,7 +127,7 @@ export default function DashboardPage() {
           date={date}
           onDateChange={setDate}
           onNew={() => setModalOpen(true)}
-          userName={user.name}
+          userName={user.name || 'Owner'}
           userRole={user.role}
         />
 
