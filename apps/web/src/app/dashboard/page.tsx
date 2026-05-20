@@ -14,8 +14,10 @@ import { RequestsView } from '@/components/dashboard/RequestsView';
 import { ClientsView } from '@/components/dashboard/ClientsView';
 import { NewBookingModal } from '@/components/dashboard/NewBookingModal';
 import { ComingSoon, SettingsStub } from '@/components/dashboard/ComingSoon';
+import { BottomSheet } from '@/components/dashboard/BottomSheet';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
-  SEED_APPTS, SEED_REQUESTS, SEED_CLIENTS,
+  SEED_APPTS, SEED_REQUESTS, SEED_CLIENTS, STAFF,
   type NavId, type Appointment, type Client,
 } from '@/components/dashboard/data';
 
@@ -54,6 +56,10 @@ export default function DashboardPage() {
   const [user, setUser]             = useState<UserInfo>({
     name: '', role: 'owner', tenantName: '', tenantCity: undefined,
   });
+
+  const isMobile = useIsMobile();
+  const [activeStaffId, setActiveStaffId] = useState<string>(STAFF[0]!.id);
+  const [sheetOpen, setSheetOpen]   = useState(false);
 
   useEffect(() => {
     fetch(`${API}/api/v1/me`, { credentials: 'include' })
@@ -132,8 +138,14 @@ export default function DashboardPage() {
             <Calendar
               appts={appts}
               selectedId={selectedAppt?.id ?? null}
-              onSelect={(a) => { setSelectedAppt(a); setPosAppt(null); }}
+              onSelect={(a) => {
+                setSelectedAppt(a);
+                setPosAppt(null);
+                if (isMobile) setSheetOpen(true);
+              }}
               onMove={handleMove}
+              activeStaffId={activeStaffId}
+              onStaffChange={setActiveStaffId}
             />
           )}
           {nav === 'requests' && (
@@ -210,6 +222,7 @@ export default function DashboardPage() {
           active={nav}
           onNavigate={navigate}
           requestsCount={requests.length}
+          onNew={() => setModalOpen(true)}
         />
       </div>
 
@@ -222,6 +235,32 @@ export default function DashboardPage() {
           setModalOpen(false);
         }}
       />
+
+      {/* Mobile appointment bottom sheet */}
+      <BottomSheet
+        open={sheetOpen && isMobile}
+        onClose={() => { setSheetOpen(false); setSelectedAppt(null); }}
+      >
+        {selectedAppt && (
+          <AppointmentPanel
+            appt={selectedAppt}
+            client={clients.find(c => c.name === selectedAppt.client) ?? null}
+            onClose={() => { setSheetOpen(false); setSelectedAppt(null); }}
+            onCheckout={() => {
+              setSheetOpen(false);
+              setPosAppt(selectedAppt);
+              setNav('pos');
+            }}
+            onReschedule={() => {}}
+            onCancel={() => {
+              setAppts(prev => prev.filter(a => a.id !== selectedAppt.id));
+              setSheetOpen(false);
+              setSelectedAppt(null);
+            }}
+            onUpdateNotes={updateClientNotes}
+          />
+        )}
+      </BottomSheet>
     </div>
   );
 }
