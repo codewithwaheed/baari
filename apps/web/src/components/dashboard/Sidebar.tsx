@@ -83,7 +83,6 @@ export function Sidebar({
   tenantCity,
 }: SidebarProps) {
   const [logoutHover, setLogoutHover] = useState(false);
-  const initials = tenantName.slice(0, 1).toUpperCase();
 
   return (
     <aside
@@ -111,15 +110,26 @@ export function Sidebar({
         borderRadius: 6,
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
+        {/* Baari B monogram — placeholder until salon uploads their own logo */}
         <div style={{
-          width: 28, height: 28, borderRadius: 4, background: 'var(--baari-lime)',
-          color: 'var(--baari-onyx)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 700, fontSize: 14,
-          flexShrink: 0,
-        }}>{initials}</div>
+          width: 32, height: 32, borderRadius: 6,
+          background: 'var(--baari-onyx)',
+          border: '1.5px solid rgba(232,255,71,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, overflow: 'hidden',
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic', fontWeight: 700,
+            fontSize: 18, lineHeight: 1,
+            color: 'var(--baari-lime)',
+            letterSpacing: '-0.03em',
+            userSelect: 'none',
+          }}>B</span>
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {tenantName}
+            {tenantName || 'My Salon'}
           </div>
           {tenantCity && (
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{tenantCity}</div>
