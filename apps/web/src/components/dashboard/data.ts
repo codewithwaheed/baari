@@ -18,17 +18,19 @@ export interface Staff {
 
 export interface Appointment {
   id: string;
-  staff: string;       // staffId
+  staff: string;            // staffId
   staffName?: string;
-  client: string;      // clientName
+  client: string;           // clientName
   phone?: string;
-  service: string;     // serviceName
-  start: number;       // decimal hours e.g. 9.5 = 9:30am
+  customerId?: string;      // DB customer UUID — present on API-loaded appointments
+  customerCreatedAt?: string; // ISO string — for "Member since"
+  service: string;          // serviceName
+  start: number;            // decimal hours e.g. 9.5 = 9:30am
   end: number;
   status: BookingStatus;
-  price: number;       // paisa
+  price: number;            // paisa
   source?: 'manual' | 'whatsapp' | 'web';
-  notes?: string;
+  notes?: string;           // customer-level notes (customers.notes, not bookings.notes)
 }
 
 export interface BookingRequest {

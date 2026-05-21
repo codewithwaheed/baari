@@ -137,7 +137,14 @@ export function AppointmentCard({
         <span style={{
           fontSize: compact ? 12 : 13, fontWeight: 600, lineHeight: 1.15,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          display: 'flex', alignItems: 'center', gap: 4,
         }}>
+          {appt.status === 'checkedIn' && (
+            <span style={{
+              display: 'inline-flex', width: 7, height: 7, borderRadius: 999, flexShrink: 0,
+              background: '#3F8A8A', boxShadow: '0 0 0 2px rgba(63,138,138,0.25)',
+            }} title="Checked in" />
+          )}
           {appt.client}
         </span>
         <span style={{ fontSize: 10, opacity: 0.75, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>

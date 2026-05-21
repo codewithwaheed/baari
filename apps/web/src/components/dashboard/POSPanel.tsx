@@ -12,12 +12,8 @@ const METHODS = [
   { id: 'card',      label: 'Card',      sub: 'Debit / credit on terminal',  icon: 'card'   },
 ] as const;
 
-// Discount options in paisa
-const DISCOUNT_OPTIONS = [
-  { value: 0,     label: 'None'        },
-  { value: 50000, label: '− PKR 500'   },
-  { value: 100000, label: '− PKR 1,000' },
-];
+// Quick discount amounts in PKR (stored as paisa in state)
+const QUICK_DISCOUNTS = [50, 100, 200] as const;
 
 export interface POSResult {
   method: string;
@@ -32,8 +28,12 @@ interface POSPanelProps {
 }
 
 export function POSPanel({ appt, onBack, onConfirm }: POSPanelProps) {
-  const [discount, setDiscount] = useState(0);
-  const [method, setMethod]     = useState<string>('cash');
+  const [discountInput, setDiscountInput] = useState('');
+  const [method, setMethod] = useState<string>('cash');
+
+  // Parse input to paisa — blank or 0 means no discount
+  const discountPKR = parseFloat(discountInput) || 0;
+  const discount = Math.round(Math.max(0, discountPKR) * 100);
 
   const subtotal = appt.price;
   const total    = Math.max(0, subtotal - discount);
@@ -92,22 +92,64 @@ export function POSPanel({ appt, onBack, onConfirm }: POSPanelProps) {
           </div>
         </section>
 
-        {/* Discount selector */}
+        {/* Discount */}
         <section>
           <Eyebrow style={{ marginBottom: 10 }}>Discount</Eyebrow>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-            {DISCOUNT_OPTIONS.map(opt => {
-              const on = discount === opt.value;
+          {/* Custom PKR input */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            background: '#fff', border: '1px solid var(--border)',
+            borderRadius: 4, overflow: 'hidden', marginBottom: 8,
+          }}>
+            <span style={{
+              padding: '0 10px', fontSize: 13, color: 'var(--fg-muted)',
+              borderRight: '1px solid var(--border-subtle)', height: '100%',
+              display: 'flex', alignItems: 'center', whiteSpace: 'nowrap',
+              background: 'var(--baari-bone)',
+            }}>PKR</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              placeholder="0"
+              value={discountInput}
+              onChange={e => setDiscountInput(e.target.value)}
+              style={{
+                flex: 1, border: 0, outline: 'none',
+                padding: '12px 12px',
+                fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 500,
+                color: 'var(--baari-onyx)',
+                background: 'transparent',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            />
+            {discountInput && (
+              <button
+                onClick={() => setDiscountInput('')}
+                style={{
+                  background: 'transparent', border: 0, cursor: 'pointer',
+                  padding: '0 12px', color: 'var(--fg-muted)',
+                }}
+              >
+                <Icon name="close" size={14} stroke={2} />
+              </button>
+            )}
+          </div>
+          {/* Quick-pick buttons */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {QUICK_DISCOUNTS.map(pkr => {
+              const on = discountPKR === pkr && discountInput === String(pkr);
               return (
-                <button key={opt.value} onClick={() => setDiscount(opt.value)} style={{
-                  padding: '10px 0', borderRadius: 4, cursor: 'pointer',
+                <button key={pkr} onClick={() => setDiscountInput(String(pkr))} style={{
+                  flex: 1, padding: '9px 0', borderRadius: 4, cursor: 'pointer',
                   background: on ? 'var(--baari-onyx)' : '#fff',
                   border: '1px solid ' + (on ? 'var(--baari-onyx)' : 'var(--border)'),
                   color: on ? '#fff' : 'var(--baari-onyx)',
                   fontFamily: 'inherit', fontSize: 13, fontWeight: 500,
-                  fontVariantNumeric: 'tabular-nums',
                   transition: 'all 120ms ease',
-                }}>{opt.label}</button>
+                }}>
+                  {pkr}
+                </button>
               );
             })}
           </div>
