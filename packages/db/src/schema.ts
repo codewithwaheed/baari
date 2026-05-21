@@ -145,7 +145,7 @@ export const bookings = pgTable('bookings', {
   index('bookings_customer_idx').on(t.customerId),
   index('bookings_state_idx').on(t.state),
   check('bookings_state_chk', sql`state IN (
-    'INITIATED','PAYMENT_PENDING','CONFIRMED','COMPLETED',
+    'INITIATED','PAYMENT_PENDING','CONFIRMED','CHECKED_IN','COMPLETED',
     'CANCELLED','NO_SHOW','EXPIRED'
   )`),
   check('bookings_source_chk', sql`source IN ('manual','whatsapp','web')`),
@@ -294,7 +294,7 @@ export type OtpLog         = typeof otpLog.$inferSelect;
 export type TeamInvite     = typeof teamInvites.$inferSelect;
 export type WorkingHours   = typeof workingHours.$inferSelect;
 
-export type BookingState   = 'INITIATED' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
+export type BookingState   = 'INITIATED' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
 export type BookingSource  = 'manual' | 'whatsapp' | 'web';
 export type PaymentGateway = 'jazzcash' | 'easypaisa' | 'raast' | 'card' | 'cash' | 'safepay';
 export type UserRole       = 'owner' | 'manager' | 'staff';

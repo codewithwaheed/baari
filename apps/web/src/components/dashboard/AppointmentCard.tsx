@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { StatusBadge, fmtPKR, fmtTime } from './primitives';
+import { StatusBadge, Icon, fmtPKR, fmtTime } from './primitives';
 import type { BookingStatus } from './primitives';
 import type { Appointment } from './data';
 
@@ -27,7 +27,7 @@ interface AppointmentCardProps {
   selected: boolean;
   onClick: () => void;
   isDragging?: boolean;
-  onDragStart?: (mouseEvent: MouseEvent, payload: DragStartPayload) => void;
+  onDragStart?: (initialClientY: number, payload: DragStartPayload) => void;
 }
 
 export function AppointmentCard({
@@ -43,14 +43,14 @@ export function AppointmentCard({
 
     const startX = e.clientX;
     const startY = e.clientY;
-    const grabY = e.clientY - e.currentTarget.getBoundingClientRect().top;
+    const grabY  = e.clientY - e.currentTarget.getBoundingClientRect().top;
 
     const onMove = (me: MouseEvent) => {
       const dist = Math.hypot(me.clientX - startX, me.clientY - startY);
       if (!dragStartedRef.current && dist > DRAG_THRESHOLD) {
         dragStartedRef.current = true;
         document.removeEventListener('mousemove', onMove);
-        onDragStart(me, { appt, grabY });
+        onDragStart(me.clientY, { appt, grabY });
       }
     };
 
@@ -61,6 +61,35 @@ export function AppointmentCard({
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!onDragStart) return;
+    dragStartedRef.current = false;
+
+    const t0     = e.touches[0]!;
+    const startX = t0.clientX;
+    const startY = t0.clientY;
+    const grabY  = t0.clientY - e.currentTarget.getBoundingClientRect().top;
+
+    const onMove = (te: TouchEvent) => {
+      const t    = te.touches[0]!;
+      const dist = Math.hypot(t.clientX - startX, t.clientY - startY);
+      if (!dragStartedRef.current && dist > DRAG_THRESHOLD) {
+        dragStartedRef.current = true;
+        te.preventDefault(); // stop scroll takeover
+        document.removeEventListener('touchmove', onMove);
+        onDragStart(t.clientY, { appt, grabY });
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+    };
+
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
   };
 
   // Suppress click if the mouse movement turned into a drag
@@ -85,6 +114,7 @@ export function AppointmentCard({
   return (
     <button
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
       onClick={handleClick}
       style={{
         position: 'absolute', top, left: 4, right: 4, height: height - 4,
@@ -95,6 +125,7 @@ export function AppointmentCard({
         padding: compact ? '4px 8px' : '8px 10px',
         textAlign: 'left', boxSizing: 'border-box',
         cursor: onDragStart ? 'grab' : 'pointer',
+        touchAction: onDragStart ? 'none' : 'auto',
         fontFamily: 'var(--font-body)', color: p.text,
         boxShadow: selected ? '0 0 0 3px rgba(232, 255, 71, 0.35)' : 'none',
         transition: 'box-shadow 120ms ease',
@@ -128,7 +159,14 @@ export function AppointmentCard({
           marginTop: 'auto',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
         }}>
-          <StatusBadge status={appt.status} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <StatusBadge status={appt.status} />
+            {appt.source === 'whatsapp' && (
+              <span title="Booked via WhatsApp" style={{ lineHeight: 0, opacity: 0.75 }}>
+                <Icon name="whatsapp" size={12} color="#25D366" stroke={0} fill="#25D366" />
+              </span>
+            )}
+          </div>
           <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.85, fontVariantNumeric: 'tabular-nums' }}>
             {fmtPKR(appt.price)}
           </span>
