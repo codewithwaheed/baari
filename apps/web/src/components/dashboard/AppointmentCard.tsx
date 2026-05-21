@@ -154,10 +154,22 @@ export function AppointmentCard({
 
       {!compact && (
         <div style={{
+          display: 'flex', alignItems: 'center', gap: 5,
           fontSize: 12, lineHeight: 1.3, opacity: 0.8,
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          overflow: 'hidden',
         }}>
-          {appt.service}
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {appt.service}
+          </span>
+          {appt.services.length > 1 && (
+            <span style={{
+              flexShrink: 0, fontSize: 10, fontWeight: 600,
+              background: 'rgba(255,255,255,0.25)', borderRadius: 999,
+              padding: '1px 5px', whiteSpace: 'nowrap',
+            }}>
+              +{appt.services.length - 1}
+            </span>
+          )}
         </div>
       )}
 

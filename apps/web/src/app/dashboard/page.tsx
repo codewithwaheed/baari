@@ -55,7 +55,8 @@ interface ApiAppointment {
   clientPhone: string;
   notes: string;             // customers.notes — persists across bookings
   customerCreatedAt: string; // ISO string
-  serviceName: string;
+  serviceName: string;       // primary service name (backward compat)
+  services: { name: string; durationMin: number; pricePaisa: number }[];
   startHour: number;
   endHour: number;
   status: Appointment['status'];
@@ -75,6 +76,7 @@ function toLocalAppt(a: ApiAppointment): Appointment {
     customerId:        a.customerId,
     customerCreatedAt: a.customerCreatedAt,
     service:           a.serviceName,
+    services:          a.services,
     start:             a.startHour,
     end:               a.endHour,
     status:            a.status,

@@ -11,11 +11,11 @@
 
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { withTenant, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
-import { createBooking, SlotUnavailableError } from '../lib/bookings/create';
+import { createBooking, SlotUnavailableError, ServiceNotFoundError } from '../lib/bookings/create';
 
 // ─── State normalisation ──────────────────────────────────────────────────────
 
@@ -59,11 +59,10 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 
 const CreateBookingSchema = z.object({
   staffId:    z.string().uuid(),
-  serviceId:  z.string().uuid(),
+  /** Ordered array of service UUIDs — min 1, max 10 per visit */
+  serviceIds: z.array(z.string().uuid()).min(1).max(10),
   customerId: z.string().uuid(),
   startTime:  z.string().datetime({ offset: true }),
-  endTime:    z.string().datetime({ offset: true }),
-  pricePaisa: z.number().int().positive(),
   source:     z.enum(['manual', 'whatsapp', 'web']).default('manual'),
   notes:      z.string().optional(),
   locationId: z.string().uuid().optional(),
@@ -121,15 +120,49 @@ export default async function bookingRoutes(app: FastifyInstance) {
         ))
     );
 
+    // Fetch all booking_services for these bookings in one query, join service names
+    const bookingIds = rows.map(r => r.id);
+    const serviceLines = bookingIds.length > 0
+      ? await withTenant(jwt.tid, async (tx) =>
+          tx
+            .select({
+              bookingId:   schema.bookingServices.bookingId,
+              sortOrder:   schema.bookingServices.sortOrder,
+              durationMin: schema.bookingServices.durationMin,
+              pricePaisa:  schema.bookingServices.pricePaisa,
+              serviceName: schema.services.name,
+            })
+            .from(schema.bookingServices)
+            .innerJoin(schema.services, eq(schema.bookingServices.serviceId, schema.services.id))
+            .where(inArray(schema.bookingServices.bookingId, bookingIds))
+            .orderBy(schema.bookingServices.sortOrder)
+        )
+      : [];
+
+    // Group service lines by bookingId
+    const servicesByBooking = new Map<string, typeof serviceLines>();
+    for (const sl of serviceLines) {
+      const existing = servicesByBooking.get(sl.bookingId) ?? [];
+      existing.push(sl);
+      servicesByBooking.set(sl.bookingId, existing);
+    }
+
     // Normalise to frontend-friendly shape.
-    // dayStart is Karachi midnight expressed as UTC (e.g. 2026-05-20T00:00+05:00 = 2026-05-19T19:00Z).
-    // The difference (startMs - midnight) already gives Karachi-local hours — no extra offset needed.
+    // dayStart is Karachi midnight expressed as UTC.
+    // The difference (startMs - midnight) already gives Karachi-local hours.
     const midnightMs = dayStart.getTime();
     const data = rows.map(r => {
       const startMs   = r.startTime.getTime();
       const endMs     = r.endTime.getTime();
       const startHour = (startMs - midnightMs) / 3_600_000;
       const endHour   = (endMs   - midnightMs) / 3_600_000;
+
+      const svcs = servicesByBooking.get(r.id) ?? [];
+      // Fall back to primary service (from bookings.service_id join) if booking_services is empty
+      // — covers seed data and bookings created before this migration.
+      const services = svcs.length > 0
+        ? svcs.map(s => ({ name: s.serviceName, durationMin: s.durationMin, pricePaisa: s.pricePaisa }))
+        : [{ name: r.serviceName, durationMin: Math.round((endHour - startHour) * 60), pricePaisa: r.pricePaisa }];
 
       return {
         id:                r.id,
@@ -139,9 +172,10 @@ export default async function bookingRoutes(app: FastifyInstance) {
         staffRole:         r.staffRole,
         clientName:        r.clientName ?? 'Unknown',
         clientPhone:       r.clientPhone,
-        notes:             r.customerNotes,        // customer-level notes, persists across bookings
+        notes:             r.customerNotes,
         customerCreatedAt: r.customerCreatedAt.toISOString(),
-        serviceName:       r.serviceName,
+        serviceName:       services[0]!.name,          // primary — kept for compat
+        services,                                      // full list for panels + POS
         startHour,
         endHour,
         status:            toFrontendStatus(r.state),
@@ -164,10 +198,14 @@ export default async function bookingRoutes(app: FastifyInstance) {
 
     try {
       const booking = await createBooking({
-        tenantId:  jwt.tid,
-        ...body.data,
-        startTime: new Date(body.data.startTime),
-        endTime:   new Date(body.data.endTime),
+        tenantId:   jwt.tid,
+        staffId:    body.data.staffId,
+        serviceIds: body.data.serviceIds,
+        customerId: body.data.customerId,
+        startTime:  new Date(body.data.startTime),
+        source:     body.data.source,
+        notes:      body.data.notes,
+        ...(body.data.locationId !== undefined && { locationId: body.data.locationId }),
       });
       return reply.code(201).send({ ok: true, data: booking });
     } catch (err) {
@@ -175,6 +213,12 @@ export default async function bookingRoutes(app: FastifyInstance) {
         return reply.code(409).send({
           ok: false,
           error: { code: 'SLOT_UNAVAILABLE', message: 'This slot is already taken' },
+        });
+      }
+      if (err instanceof ServiceNotFoundError) {
+        return reply.code(404).send({
+          ok: false,
+          error: { code: 'SERVICE_NOT_FOUND', message: (err as Error).message },
         });
       }
       throw err;
@@ -378,6 +422,117 @@ export default async function bookingRoutes(app: FastifyInstance) {
         paidAt:       row.paidAt.toISOString(),
       },
     });
+  });
+
+  // ── GET /bookings/availability ────────────────────────────────────────────
+  // Returns available 30-minute-stepped slots for a given staff + date + service duration.
+  // Filters out: existing confirmed/pending bookings, break windows, and slots that would
+  // end after close time.
+  app.get('/availability', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+
+    const AvailabilitySchema = z.object({
+      staffId:            z.string().uuid(),
+      date:               z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      serviceDurationMin: z.coerce.number().int().positive(),
+    });
+
+    const parsed = AvailabilitySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.message } });
+    }
+
+    const { staffId, date, serviceDurationMin } = parsed.data;
+    const durationHours = serviceDurationMin / 60;
+
+    // Karachi midnight for the requested date — used as the epoch for decimal-hour offsets.
+    const dayStart = new Date(`${date}T00:00:00+05:00`);
+    const dayEnd   = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    // 0=Sun, 1=Mon … matching working_hours.day_of_week
+    const dayOfWeek = dayStart.getDay();
+
+    // Fetch working hours and existing bookings in parallel
+    const [whRows, bookingRows] = await Promise.all([
+      withTenant(jwt.tid, async (tx) =>
+        tx.select()
+          .from(schema.workingHours)
+          .where(and(
+            eq(schema.workingHours.tenantId, jwt.tid),
+            eq(schema.workingHours.dayOfWeek, dayOfWeek),
+          ))
+          .limit(1)
+      ),
+      withTenant(jwt.tid, async (tx) =>
+        tx.select({ startTime: schema.bookings.startTime, endTime: schema.bookings.endTime })
+          .from(schema.bookings)
+          .where(and(
+            eq(schema.bookings.tenantId, jwt.tid),
+            eq(schema.bookings.staffId, staffId),
+            gte(schema.bookings.startTime, dayStart),
+            lte(schema.bookings.startTime, dayEnd),
+            inArray(schema.bookings.state, ['PAYMENT_PENDING', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED']),
+          ))
+      ),
+    ]);
+
+    const wh = whRows[0];
+
+    // If the salon is closed that day, return empty slot list
+    if (wh && !wh.isOpen) {
+      return reply.send({ ok: true, data: [] });
+    }
+
+    const openTime  = wh?.openTime  ?? '09:00';
+    const closeTime = wh?.closeTime ?? '20:00';
+    const breaks    = wh?.breaks    ?? [];
+
+    // Parse "HH:MM" → decimal hours
+    function parseHHMM(t: string): number {
+      const [hh, mm] = t.split(':').map(Number);
+      return (hh ?? 0) + (mm ?? 0) / 60;
+    }
+
+    const openHour  = parseHHMM(openTime);
+    const closeHour = parseHHMM(closeTime);
+
+    // Convert DB bookings to decimal hours relative to Karachi midnight
+    const dayStartMs = dayStart.getTime();
+    const bookedSlots = bookingRows.map(b => ({
+      start: (b.startTime.getTime() - dayStartMs) / 3_600_000,
+      end:   (b.endTime.getTime()   - dayStartMs) / 3_600_000,
+    }));
+
+    const breakSlots = breaks.map(b => ({
+      start: parseHHMM(b.from),
+      end:   parseHHMM(b.to),
+    }));
+
+    function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+      return aStart < bEnd && aEnd > bStart;
+    }
+
+    function fmtLabel(h: number): string {
+      const period = h >= 12 ? 'pm' : 'am';
+      const hr = Math.floor(h);
+      const m  = Math.round((h - hr) * 60);
+      const display = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+      return m ? `${display}:${String(m).padStart(2, '0')}${period}` : `${display}${period}`;
+    }
+
+    const slots: { startHour: number; endHour: number; label: string }[] = [];
+    // Step every 30 min from open to (close − duration)
+    for (let h = openHour; h + durationHours <= closeHour; h += 0.5) {
+      const slotEnd = parseFloat((h + durationHours).toFixed(4));
+
+      const blockedByBooking = bookedSlots.some(b => overlaps(h, slotEnd, b.start, b.end));
+      const blockedByBreak   = breakSlots.some(b  => overlaps(h, slotEnd, b.start, b.end));
+
+      if (!blockedByBooking && !blockedByBreak) {
+        slots.push({ startHour: h, endHour: slotEnd, label: fmtLabel(h) });
+      }
+    }
+
+    return reply.send({ ok: true, data: slots });
   });
 
   // ── PATCH /bookings/:id/notes ──────────────────────────────────────────────
