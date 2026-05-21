@@ -277,6 +277,25 @@ export const workingHours = pgTable('working_hours', {
   check('working_hours_day_chk', sql`day_of_week BETWEEN 0 AND 6`),
 ]);
 
+// ─── Booking Services ─────────────────────────────────────────────────────────
+// Junction table — one row per service within a booking session.
+// bookings.service_id still points to services[0] (primary) for backward compat.
+// bookings.price_paisa is the SUM of all service prices here.
+
+export const bookingServices = pgTable('booking_services', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  bookingId:   uuid('booking_id').notNull().references(() => bookings.id, { onDelete: 'cascade' }),
+  tenantId:    uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serviceId:   uuid('service_id').notNull().references(() => services.id),
+  durationMin: integer('duration_min').notNull(),
+  pricePaisa:  bigint('price_paisa', { mode: 'number' }).notNull(),
+  sortOrder:   integer('sort_order').notNull().default(0),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index('booking_services_booking_idx').on(t.bookingId),
+  index('booking_services_tenant_idx').on(t.tenantId),
+]);
+
 // ─── Type exports ─────────────────────────────────────────────────────────────
 
 export type Tenant         = typeof tenants.$inferSelect;
@@ -293,6 +312,7 @@ export type RefreshToken   = typeof refreshTokens.$inferSelect;
 export type OtpLog         = typeof otpLog.$inferSelect;
 export type TeamInvite     = typeof teamInvites.$inferSelect;
 export type WorkingHours   = typeof workingHours.$inferSelect;
+export type BookingService = typeof bookingServices.$inferSelect;
 
 export type BookingState   = 'INITIATED' | 'PAYMENT_PENDING' | 'CONFIRMED' | 'CHECKED_IN' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW' | 'EXPIRED';
 export type BookingSource  = 'manual' | 'whatsapp' | 'web';

@@ -35,7 +35,8 @@ export function POSPanel({ appt, onBack, onConfirm }: POSPanelProps) {
   const discountPKR = parseFloat(discountInput) || 0;
   const discount = Math.round(Math.max(0, discountPKR) * 100);
 
-  const subtotal = appt.price;
+  // Subtotal = sum of all service prices (equals appt.price for confirmed bookings)
+  const subtotal = appt.services.reduce((sum, s) => sum + s.pricePaisa, 0) || appt.price;
   const total    = Math.max(0, subtotal - discount);
 
   return (
@@ -65,30 +66,42 @@ export function POSPanel({ appt, onBack, onConfirm }: POSPanelProps) {
       {/* Body */}
       <div style={{ flex: 1, overflow: 'auto', padding: '18px 24px 24px', display: 'flex', flexDirection: 'column', gap: 22 }}>
 
-        {/* Service line item */}
+        {/* Service line items */}
         <section>
-          <Eyebrow style={{ marginBottom: 8 }}>Service</Eyebrow>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 2,
-            padding: '14px 16px',
-          }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: 4, flexShrink: 0,
-              background: 'var(--baari-espresso)', color: 'var(--baari-lime)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon name="scissors" size={17} stroke={1.6} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, color: 'var(--baari-onyx)', fontWeight: 500 }}>{appt.service}</div>
-              <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>
-                {fmtTimeRange(appt.start, appt.end)}
+          <Eyebrow style={{ marginBottom: 8 }}>Services</Eyebrow>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {appt.services.map((svc, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 2,
+                padding: '12px 16px',
+              }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 4, flexShrink: 0,
+                  background: i === 0 ? 'var(--baari-espresso)' : 'var(--baari-bone)',
+                  color: i === 0 ? 'var(--baari-lime)' : 'var(--baari-graphite)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 700,
+                }}>
+                  {i === 0 ? <Icon name="scissors" size={15} stroke={1.6} /> : i + 1}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, color: 'var(--baari-onyx)', fontWeight: 500 }}>{svc.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{svc.durationMin} min</div>
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--baari-onyx)', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtPKR(svc.pricePaisa)}
+                </div>
               </div>
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--baari-onyx)', fontVariantNumeric: 'tabular-nums' }}>
-              {fmtPKR(subtotal)}
-            </div>
+            ))}
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 16px', marginTop: 2,
+            fontSize: 11, color: 'var(--fg-muted)',
+          }}>
+            <span><Icon name="clock" size={11} color="var(--fg-muted)" /> {fmtTimeRange(appt.start, appt.end)}</span>
+            <span>{appt.services.reduce((s, svc) => s + svc.durationMin, 0)} min total</span>
           </div>
         </section>
 

@@ -160,6 +160,19 @@ async function applyMigration(
     console.log('✓ Migration 0005 applied — bookings state constraint fixed.');
   }
 
+  // ── Apply 0006_booking_services ─────────────────────────────────────────────
+  const { rows: rows6 } = await client.query<{ exists: string | null }>(`
+    SELECT to_regclass('public.booking_services') AS exists
+  `);
+  if (rows6[0]?.exists) {
+    console.log('✓ Migration 0006_booking_services already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0006_booking_services.sql...');
+    const sql6 = readFileSync(join(__dirname, 'migrations/0006_booking_services.sql'), 'utf-8');
+    await client.query(sql6);
+    console.log('✓ Migration 0006 applied.');
+  }
+
   // ── RLS patches (idempotent) ─────────────────────────────────────────────────
   // Applied on every run to ensure RLS is correct even if 0002_auth.sql ran before
   // these policies were added.

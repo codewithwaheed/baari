@@ -132,10 +132,28 @@ export function AppointmentPanel({ appt, client, visits, payment, onClose, onChe
           <section style={{
             background: '#fff', border: '1px solid var(--border-subtle)', borderRadius: 2, padding: 16,
           }}>
-            <Eyebrow style={{ marginBottom: 10 }}>Today's appointment</Eyebrow>
-            <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--baari-onyx)', lineHeight: 1.3 }}>
-              {appt.service}
-            </div>
+            <Eyebrow style={{ marginBottom: 10 }}>Today's visit</Eyebrow>
+
+            {/* Service line items */}
+            {appt.services.map((svc, i) => (
+              <div key={i} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                paddingBottom: i < appt.services.length - 1 ? 8 : 0,
+                marginBottom: i < appt.services.length - 1 ? 8 : 0,
+                borderBottom: i < appt.services.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+              }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--baari-onyx)', lineHeight: 1.3 }}>
+                    {svc.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--fg-muted)', marginTop: 2 }}>{svc.durationMin} min</div>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--fg-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtPKR(svc.pricePaisa)}
+                </div>
+              </div>
+            ))}
+
             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: 'var(--fg-secondary)', flexWrap: 'wrap' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <Icon name="clock" size={13} /> {fmtTimeRange(appt.start, appt.end)}
@@ -148,7 +166,7 @@ export function AppointmentPanel({ appt, client, visits, payment, onClose, onChe
               marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border-subtle)',
               display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
             }}>
-              <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Service total</span>
+              <span style={{ fontSize: 12, color: 'var(--fg-muted)' }}>Session total</span>
               <span style={{
                 fontFamily: 'var(--font-display)', fontSize: 24,
                 letterSpacing: '-0.01em', color: 'var(--baari-onyx)',
@@ -170,10 +188,12 @@ export function AppointmentPanel({ appt, client, visits, payment, onClose, onChe
                 }}>PAID</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontVariantNumeric: 'tabular-nums' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--fg-secondary)' }}>
-                  <span>Service</span>
-                  <span>{fmtPKR(appt.price)}</span>
-                </div>
+                {appt.services.map((svc, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--fg-secondary)' }}>
+                    <span>{svc.name}</span>
+                    <span>{fmtPKR(svc.pricePaisa)}</span>
+                  </div>
+                ))}
                 {payment.discountPaisa > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#3A5F46', fontWeight: 500 }}>
                     <span>Discount</span>
