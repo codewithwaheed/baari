@@ -6,7 +6,6 @@ import { AppointmentCard, APPT_PALETTES } from './AppointmentCard';
 import type { DragStartPayload } from './AppointmentCard';
 import { StaffPillRow } from './StaffPillRow';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { STAFF } from './data';
 import type { Appointment, Staff } from './data';
 
 const HOUR_PX    = 76;
@@ -36,14 +35,16 @@ interface DragState {
 
 interface CalendarProps {
   appts: Appointment[];
+  staff: Staff[];
   selectedId?: string | null;
   onSelect?: (a: Appointment) => void;
   onMove?: (apptId: string, newStart: number, newEnd: number) => void;
   activeStaffId?: string;
   onStaffChange?: (id: string) => void;
+  loading?: boolean;
 }
 
-export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, onStaffChange }: CalendarProps) {
+export function Calendar({ appts, staff, selectedId, onSelect, onMove, activeStaffId, onStaffChange, loading = false }: CalendarProps) {
   // Live "now" line
   const [nowHour, setNowHour] = useState(() => {
     const n = new Date();
@@ -83,57 +84,61 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
     return () => { html.style.cursor = ''; html.style.userSelect = ''; };
   }, [isDragging]);
 
-  // Called by AppointmentCard once drag threshold is crossed
-  const handleDragStart = (startEvent: MouseEvent, { appt, grabY }: DragStartPayload) => {
-    if (!containerRef.current || !headerRef.current) return;
+  // Called by AppointmentCard once drag threshold is crossed.
+  // Works for both mouse and touch — caller passes the initial clientY.
+  const handleDragStart = (initialClientY: number, { appt, grabY }: DragStartPayload) => {
+    if (!containerRef.current) return;
 
-    // Snapshot layout at drag start (avoids repeated reflows in mousemove)
-    const containerRect  = containerRef.current.getBoundingClientRect();
-    const headerH        = headerRef.current.offsetHeight;
-
-    const duration = appt.end - appt.start;
+    // Snapshot layout at drag start (avoids repeated reflows during move)
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const headerH       = headerRef.current?.offsetHeight ?? 0; // 0 on mobile (no sticky header)
+    const duration      = appt.end - appt.start;
 
     const initial: DragState = { apptId: appt.id, staffId: appt.staff, duration, snapStart: appt.start };
     setDrag(initial);
 
-    const onMouseMove = (me: MouseEvent) => {
+    const updatePos = (clientY: number) => {
       const scrollTop = containerRef.current?.scrollTop ?? 0;
-      // Y relative to the top of the grid body (below sticky header)
-      const relY = me.clientY - containerRect.top - headerH + scrollTop - grabY;
-      const rawStart = START_HOUR + relY / HOUR_PX;
-      const clamped  = Math.max(START_HOUR, Math.min(END_HOUR - dragRef.current!.duration, snapHour(rawStart)));
-
-      const next = { ...dragRef.current!, snapStart: clamped };
+      const relY      = clientY - containerRect.top - headerH + scrollTop - grabY;
+      const rawStart  = START_HOUR + relY / HOUR_PX;
+      const clamped   = Math.max(START_HOUR, Math.min(END_HOUR - dragRef.current!.duration, snapHour(rawStart)));
+      const next      = { ...dragRef.current!, snapStart: clamped };
       dragRef.current = next;
-      setDragState({ ...next }); // shallow copy to trigger re-render
+      setDragState({ ...next });
     };
 
-    const onMouseUp = () => {
+    const commit = () => {
       document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('mouseup',   commit);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend',  commit);
       const d = dragRef.current;
       if (d) onMove?.(d.apptId, d.snapStart, d.snapStart + d.duration);
       setDrag(null);
     };
 
-    // Use the startEvent to kick off the first position update immediately
-    onMouseMove(startEvent);
+    const onMouseMove = (me: MouseEvent) => updatePos(me.clientY);
+    const onTouchMove = (te: TouchEvent) => { te.preventDefault(); updatePos(te.touches[0]!.clientY); };
+
+    updatePos(initialClientY);
     document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('mouseup',   commit);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend',  commit);
   };
 
   const showNow = nowHour >= START_HOUR && nowHour <= END_HOUR;
 
   const isMobile = useIsMobile();
-  const activeStaff: Staff = STAFF.find(s => s.id === activeStaffId) ?? STAFF[0]!;
-  const mobileAppts = appts.filter(a => a.staff === activeStaff.id);
+  const activeStaff: Staff | undefined = staff.find(s => s.id === activeStaffId) ?? staff[0];
+  const mobileAppts = activeStaff ? appts.filter(a => a.staff === activeStaff.id) : [];
 
   if (isMobile) {
     return (
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', fontFamily: 'var(--font-body)' }}>
         <StaffPillRow
-          staff={STAFF}
-          activeId={activeStaff.id}
+          staff={staff}
+          activeId={activeStaff?.id ?? ''}
           onChange={id => onStaffChange?.(id)}
         />
         <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
@@ -169,12 +174,12 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
                   top={toY(a.start)}
                   height={(a.end - a.start) * HOUR_PX}
                   selected={selectedId === a.id}
-                  isDragging={false}
+                  isDragging={drag?.apptId === a.id}
                   onClick={() => onSelect?.(a)}
-                  onDragStart={() => {}}
+                  onDragStart={handleDragStart}
                 />
               ))}
-              {mobileAppts.length === 0 && (
+              {mobileAppts.length === 0 && !drag && (
                 <div style={{
                   position: 'absolute', inset: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -183,6 +188,40 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
                   No appointments today
                 </div>
               )}
+
+              {/* Mobile drag ghost */}
+              {drag && (() => {
+                const ghostAppt = mobileAppts.find(a => a.id === drag.apptId);
+                if (!ghostAppt) return null;
+                const gp = APPT_PALETTES[ghostAppt.status] ?? APPT_PALETTES.confirmed;
+                return (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      top: toY(drag.snapStart), left: 4, right: 4,
+                      height: drag.duration * HOUR_PX - 4,
+                      background: gp.bg,
+                      border: `1px solid ${gp.accent}`,
+                      borderLeft: `3px solid ${gp.accent}`,
+                      borderRadius: 4,
+                      boxShadow: '0 6px 24px rgba(40,34,25,0.18), 0 0 0 2.5px rgba(232,255,71,0.55)',
+                      opacity: 0.96,
+                      pointerEvents: 'none',
+                      zIndex: 20,
+                      display: 'flex', flexDirection: 'column',
+                      padding: '8px 10px', gap: 4, overflow: 'hidden',
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: gp.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {ghostAppt.client}
+                    </span>
+                    <span style={{ fontSize: 11, color: gp.accent, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                      {fmtTime(drag.snapStart)} – {fmtTime(drag.snapStart + drag.duration)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
             {/* Now line */}
             {showNow && (
@@ -212,11 +251,11 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
       <div ref={headerRef} style={{
         position: 'sticky', top: 0, zIndex: 5,
         display: 'grid',
-        gridTemplateColumns: `${TIME_GUTTER}px repeat(${STAFF.length}, 1fr)`,
+        gridTemplateColumns: `${TIME_GUTTER}px repeat(${staff.length}, 1fr)`,
         background: '#fff', borderBottom: '1px solid var(--border)',
       }}>
         <div />
-        {STAFF.map(s => (
+        {staff.map(s => (
           <div key={s.id} style={{
             padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10,
             borderLeft: '1px solid var(--border-subtle)',
@@ -234,7 +273,7 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
       <div style={{
         position: 'relative',
         display: 'grid',
-        gridTemplateColumns: `${TIME_GUTTER}px repeat(${STAFF.length}, 1fr)`,
+        gridTemplateColumns: `${TIME_GUTTER}px repeat(${staff.length}, 1fr)`,
         minHeight: (END_HOUR - START_HOUR) * HOUR_PX,
       }}>
         {/* Time gutter */}
@@ -250,24 +289,32 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
         </div>
 
         {/* Staff columns */}
-        {STAFF.map(s => {
+        {staff.map(s => {
           const ghostAppt = drag?.staffId === s.id ? appts.find(a => a.id === drag.apptId) : null;
           const gp = ghostAppt ? (APPT_PALETTES[ghostAppt.status] ?? APPT_PALETTES.confirmed) : null;
+
+          const staffAppts = appts.filter(a => a.staff === s.id);
 
           return (
             <div key={s.id} style={{
               position: 'relative', borderLeft: '1px solid var(--border-subtle)', background: '#fff',
             }}>
-              {/* Hour grid lines */}
+              {/* Hour + half-hour grid lines */}
               {HOURS.map((h, i) => (
                 <div key={h} style={{
                   position: 'absolute', top: i * HOUR_PX, left: 0, right: 0, height: HOUR_PX,
                   borderBottom: i < HOURS.length - 1 ? '1px solid var(--border-subtle)' : undefined,
-                }} />
+                }}>
+                  {/* Half-hour dashed line */}
+                  <div style={{
+                    position: 'absolute', top: HOUR_PX / 2, left: 0, right: 0,
+                    borderTop: '1px dashed rgba(0,0,0,0.07)',
+                  }} />
+                </div>
               ))}
 
               {/* Appointments */}
-              {appts.filter(a => a.staff === s.id).map(a => (
+              {staffAppts.map(a => (
                 <AppointmentCard
                   key={a.id}
                   appt={a}
@@ -278,6 +325,35 @@ export function Calendar({ appts, selectedId, onSelect, onMove, activeStaffId, o
                   onClick={() => onSelect?.(a)}
                   onDragStart={handleDragStart}
                 />
+              ))}
+
+              {/* Empty state */}
+              {!loading && staffAppts.length === 0 && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}>
+                  <span style={{
+                    fontSize: 11, color: 'var(--fg-muted)', letterSpacing: '0.03em',
+                    background: 'rgba(255,255,255,0.85)', padding: '4px 10px', borderRadius: 99,
+                  }}>Free today</span>
+                </div>
+              )}
+
+              {/* Skeleton cards while loading */}
+              {loading && [0.35, 0.5, 0.28].map((h, i) => (
+                <div key={i} style={{
+                  position: 'absolute',
+                  top: toY(START_HOUR + 1 + i * 3.2),
+                  left: 4, right: 4,
+                  height: h * HOUR_PX * 2,
+                  borderRadius: 4,
+                  background: 'linear-gradient(90deg, #f0ede8 25%, #e8e4dd 50%, #f0ede8 75%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'baari-shimmer 1.5s infinite',
+                  opacity: 0.7,
+                }} />
               ))}
 
               {/* Drag ghost — elevated card that follows the cursor */}

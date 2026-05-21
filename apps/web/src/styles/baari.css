@@ -456,6 +456,8 @@ html, body {
 .topbar-search       { }
 .topbar-new-btn      { }
 .topbar-fab          { display: none; }
+/* Desktop: date label floats after the right chevron */
+.topbar-date-label   { order: 10; margin-left: 6px; }
 
 @media (max-width: 767px) {
   .dashboard-sidebar  { display: none !important; }
@@ -525,5 +527,20 @@ html, body {
     letter-spacing: 0 !important;
   }
 
-  .topbar-date-label { display: none !important; }
+  .topbar-today-btn  { display: none !important; }
+  /* On mobile date label sits between the two arrows (natural DOM order) */
+  .topbar-date-label { order: 0 !important; margin-left: 0 !important; }
+  .topbar-date-label span:last-child { display: none; }
+}
+
+/* ============================================================
+   Shimmer animation — skeleton loading
+   ============================================================ */
+@keyframes baari-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

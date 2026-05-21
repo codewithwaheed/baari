@@ -57,10 +57,10 @@ async function build() {
   await app.register(import('./routes/auth'),        { prefix: '/api/v1/auth' });
   await app.register(import('./routes/me'),          { prefix: '/api/v1/me' });
   await app.register(import('./routes/onboarding'),  { prefix: '/api/v1/onboarding' });
-  // await app.register(import('./routes/bookings'), { prefix: '/api/v1/bookings' });
-  // await app.register(import('./routes/staff'), { prefix: '/api/v1/staff' });
-  // await app.register(import('./routes/services'), { prefix: '/api/v1/services' });
-  // await app.register(import('./routes/customers'), { prefix: '/api/v1/customers' });
+  await app.register(import('./routes/bookings'),   { prefix: '/api/v1/bookings' });
+  await app.register(import('./routes/staff'),      { prefix: '/api/v1/staff' });
+  await app.register(import('./routes/services'),   { prefix: '/api/v1/services' });
+  await app.register(import('./routes/customers'),  { prefix: '/api/v1/customers' });
   // await app.register(import('./routes/requests'), { prefix: '/api/v1/requests' });
   // await app.register(import('./routes/webhooks/whatsapp'), { prefix: '/webhooks' });
   // await app.register(import('./routes/webhooks/payments'), { prefix: '/webhooks' });

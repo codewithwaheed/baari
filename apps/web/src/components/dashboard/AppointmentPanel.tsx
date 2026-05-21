@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { StatusBadge, Avatar, IconButton, DButton, Icon, Eyebrow, fmtPKR, fmtTimeRange } from './primitives';
-import { STAFF } from './data';
 import type { Appointment, Client } from './data';
 
 interface AppointmentPanelProps {
@@ -24,7 +23,8 @@ export function AppointmentPanel({ appt, client, onClose, onCheckout, onReschedu
     setEditing(false);
   }, [appt.id, client?.id]);
 
-  const staff = STAFF.find(s => s.id === appt.staff);
+  // Use staffName from API response; fall back to staff id as last resort
+  const staffName = appt.staffName ?? appt.staff;
   const visits = client?.history?.length ?? 1;
   const memberSince = client?.history?.length
     ? (client.history[client.history.length - 1].date ?? '').split(', ').pop() ?? '2024'
@@ -86,7 +86,7 @@ export function AppointmentPanel({ appt, client, onClose, onCheckout, onReschedu
               <Icon name="clock" size={13} /> {fmtTimeRange(appt.start, appt.end)}
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-              <Icon name="user" size={13} /> {staff?.name ?? '—'}
+              <Icon name="user" size={13} /> {staffName}
             </span>
           </div>
           <div style={{
@@ -113,9 +113,9 @@ export function AppointmentPanel({ appt, client, onClose, onCheckout, onReschedu
               <Icon name="phone" size={14} color="var(--fg-muted)" />
               {phone}
             </span>
-            {optIn && (
+            {appt.source === 'whatsapp' && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#1B6E3F', fontSize: 12, fontWeight: 500 }}>
-                <Icon name="whatsapp" size={14} color="#25D366" stroke={1.6} />
+                <Icon name="whatsapp" size={14} fill="#25D366" />
                 Booked via WhatsApp
               </span>
             )}

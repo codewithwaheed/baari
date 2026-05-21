@@ -18,14 +18,17 @@ export interface Staff {
 
 export interface Appointment {
   id: string;
-  staff: string;
-  client: string;
+  staff: string;       // staffId
+  staffName?: string;
+  client: string;      // clientName
   phone?: string;
-  service: string;
-  start: number; // decimal hours e.g. 9.5 = 9:30am
+  service: string;     // serviceName
+  start: number;       // decimal hours e.g. 9.5 = 9:30am
   end: number;
   status: BookingStatus;
-  price: number; // paisa
+  price: number;       // paisa
+  source?: 'manual' | 'whatsapp' | 'web';
+  notes?: string;
 }
 
 export interface BookingRequest {

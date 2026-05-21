@@ -98,12 +98,13 @@ interface IconProps {
   size?: number;
   color?: string;
   stroke?: number;
+  fill?: string;
 }
 
-export function Icon({ name, size = 20, color = 'currentColor', stroke = 1.5 }: IconProps) {
+export function Icon({ name, size = 20, color = 'currentColor', stroke = 1.5, fill = 'none' }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
+      stroke={fill !== 'none' ? 'none' : color} strokeWidth={fill !== 'none' ? 0 : stroke} strokeLinecap="round" strokeLinejoin="round">
       {PATHS[name] || null}
     </svg>
   );

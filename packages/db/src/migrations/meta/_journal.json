@@ -22,6 +22,13 @@
       "when": 1748390400000,
       "tag": "0003_working_hours_breaks",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1747872000000,
+      "tag": "0004_checked_in_state",
+      "breakpoints": true
     }
   ]
 }
