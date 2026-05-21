@@ -2,7 +2,7 @@
 // Customer routes — tenant-scoped via JWT tid claim.
 
 import type { FastifyInstance } from 'fastify';
-import { eq, and, or, ilike } from 'drizzle-orm';
+import { eq, and, or, ilike, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { withTenant, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
@@ -33,6 +33,12 @@ export function normalizePhone(raw: string): string {
 const CreateCustomerSchema = z.object({
   phone: z.string().min(6),
   name:  z.string().min(1).max(120),
+});
+
+const UpdateCustomerSchema = z.object({
+  notes: z.string().optional(),
+  isVip: z.boolean().optional(),
+  name:  z.string().min(1).max(120).optional(),
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -147,5 +153,85 @@ export default async function customerRoutes(app: FastifyInstance) {
     );
 
     return reply.code(201).send({ ok: true, data: created, created: true });
+  });
+
+  // ── GET /customers/:id/bookings ──────────────────────────────────────────
+  // Returns the last N completed bookings for a customer — used for "Recent visits" panel.
+  app.get('/:id/bookings', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+    const { id } = request.params as { id: string };
+    const { limit: limitStr } = request.query as { limit?: string };
+    const limit = Math.min(parseInt(limitStr ?? '5', 10) || 5, 20);
+
+    const rows = await withTenant(jwt.tid, async (tx) =>
+      tx.select({
+        serviceName: schema.services.name,
+        startTime:   schema.bookings.startTime,
+        staffName:   schema.staff.name,
+        pricePaisa:  schema.bookings.pricePaisa,
+        state:       schema.bookings.state,
+      })
+        .from(schema.bookings)
+        .innerJoin(schema.services, eq(schema.bookings.serviceId, schema.services.id))
+        .innerJoin(schema.staff,    eq(schema.bookings.staffId,   schema.staff.id))
+        .where(and(
+          eq(schema.bookings.customerId, id),
+          eq(schema.bookings.tenantId,   jwt.tid),
+        ))
+        .orderBy(desc(schema.bookings.startTime))
+        .limit(limit)
+    );
+
+    const data = rows.map(r => ({
+      service: r.serviceName,
+      date:    r.startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Karachi' }),
+      staff:   r.staffName,
+      amount:  r.pricePaisa,
+      state:   r.state,
+    }));
+
+    return reply.send({ ok: true, data });
+  });
+
+  // ── PATCH /customers/:id ──────────────────────────────────────────────────
+  app.patch('/:id', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+    const { id } = request.params as { id: string };
+
+    const parsed = UpdateCustomerSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.message } });
+    }
+
+    const { notes, isVip, name } = parsed.data;
+    if (notes === undefined && isVip === undefined && name === undefined) {
+      return reply.code(400).send({ ok: false, error: { code: 'VALIDATION_ERROR', message: 'Provide at least one field' } });
+    }
+
+    const setFields: Record<string, unknown> = { updatedAt: new Date() };
+    if (notes !== undefined) setFields['notes'] = notes;
+    if (isVip !== undefined) setFields['isVip'] = isVip;
+    if (name  !== undefined) setFields['name']  = name;
+
+    const [updated] = await withTenant(jwt.tid, async (tx) =>
+      tx.update(schema.customers)
+        .set(setFields)
+        .where(and(
+          eq(schema.customers.id, id),
+          eq(schema.customers.tenantId, jwt.tid),
+        ))
+        .returning({
+          id:    schema.customers.id,
+          name:  schema.customers.name,
+          notes: schema.customers.notes,
+          isVip: schema.customers.isVip,
+        })
+    );
+
+    if (!updated) {
+      return reply.code(404).send({ ok: false, error: { code: 'NOT_FOUND', message: 'Customer not found' } });
+    }
+
+    return reply.send({ ok: true, data: updated });
   });
 }

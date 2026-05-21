@@ -8,17 +8,18 @@ import { Sidebar } from '@/components/dashboard/Sidebar';
 import { BottomNav } from '@/components/dashboard/BottomNav';
 import { Topbar } from '@/components/dashboard/Topbar';
 import { Calendar } from '@/components/dashboard/Calendar';
-import { AppointmentPanel, AppointmentPanelEmpty } from '@/components/dashboard/AppointmentPanel';
+import { AppointmentPanel, AppointmentPanelEmpty, type PaymentInfo } from '@/components/dashboard/AppointmentPanel';
 import { POSPanel } from '@/components/dashboard/POSPanel';
 import { RequestsView } from '@/components/dashboard/RequestsView';
 import { ClientsView } from '@/components/dashboard/ClientsView';
 import { NewBookingModal } from '@/components/dashboard/NewBookingModal';
 import { ComingSoon, SettingsStub } from '@/components/dashboard/ComingSoon';
 import { BottomSheet } from '@/components/dashboard/BottomSheet';
+import { ToastStack, useToasts } from '@/components/dashboard/Toast';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   SEED_APPTS, SEED_REQUESTS, SEED_CLIENTS, STAFF as SEED_STAFF,
-  type NavId, type Appointment, type Staff, type Client,
+  type NavId, type Appointment, type Staff, type Client, type VisitRecord,
 } from '@/components/dashboard/data';
 
 // ── Staff colour palette ──────────────────────────────────────────────────────
@@ -48,34 +49,38 @@ interface ApiStaff {
 interface ApiAppointment {
   id: string;
   staffId: string;
+  customerId: string;
   staffName: string;
   clientName: string;
   clientPhone: string;
+  notes: string;             // customers.notes — persists across bookings
+  customerCreatedAt: string; // ISO string
   serviceName: string;
   startHour: number;
   endHour: number;
   status: Appointment['status'];
   pricePkr: number;
   source: 'manual' | 'whatsapp' | 'web';
-  notes: string;
 }
 
 // ── Mapping functions ─────────────────────────────────────────────────────────
 
 function toLocalAppt(a: ApiAppointment): Appointment {
   return {
-    id:       a.id,
-    staff:    a.staffId,
-    staffName: a.staffName,
-    client:   a.clientName,
-    phone:    a.clientPhone,
-    service:  a.serviceName,
-    start:    a.startHour,
-    end:      a.endHour,
-    status:   a.status,
-    price:    a.pricePkr * 100, // convert PKR → paisa for display helpers
-    source:   a.source,
-    notes:    a.notes,
+    id:                a.id,
+    staff:             a.staffId,
+    staffName:         a.staffName,
+    client:            a.clientName,
+    phone:             a.clientPhone,
+    customerId:        a.customerId,
+    customerCreatedAt: a.customerCreatedAt,
+    service:           a.serviceName,
+    start:             a.startHour,
+    end:               a.endHour,
+    status:            a.status,
+    price:             a.pricePkr * 100,
+    source:            a.source,
+    notes:             a.notes,
   };
 }
 
@@ -141,6 +146,12 @@ export default function DashboardPage() {
   const [user, setUser]             = useState<UserInfo>({
     name: '', role: 'owner', tenantName: '', tenantCity: undefined,
   });
+
+  const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
+  // Customer visit history fetched on appointment select, keyed by customerId
+  const [customerVisits, setCustomerVisits] = useState<Record<string, VisitRecord[]>>({});
+  // Payment info for completed bookings, keyed by bookingId
+  const [paymentByAppt, setPaymentByAppt] = useState<Record<string, PaymentInfo>>({});
 
   const isMobile = useIsMobile();
   const [activeStaffId, setActiveStaffId] = useState<string>(SEED_STAFF[0]!.id);
@@ -241,6 +252,150 @@ export default function DashboardPage() {
     setClients(prev => prev.map(c => c.id === id ? { ...c, notes } : c));
   };
 
+  const handleCheckIn = async (apptId: string) => {
+    const orig = apptsRef.current.find(a => a.id === apptId);
+    setAppts(prev => prev.map(a => a.id === apptId ? { ...a, status: 'checkedIn' } : a));
+    setSelectedAppt(prev => prev?.id === apptId ? { ...prev, status: 'checkedIn' } : prev);
+    try {
+      const res = await fetch(`${API}/api/v1/bookings/${apptId}/status`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'checkedIn' }),
+      });
+      if (!res.ok) throw new Error('check-in failed');
+    } catch {
+      if (orig) {
+        setAppts(prev => prev.map(a => a.id === apptId ? orig : a));
+        setSelectedAppt(prev => prev?.id === apptId ? orig : prev);
+      }
+    }
+  };
+
+  const handleCancel = async (apptId: string) => {
+    const orig = apptsRef.current.find(a => a.id === apptId);
+    setAppts(prev => prev.filter(a => a.id !== apptId));
+    setSelectedAppt(null);
+    try {
+      const res = await fetch(`${API}/api/v1/bookings/${apptId}/status`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'cancelled' }),
+      });
+      if (!res.ok) throw new Error('cancel failed');
+    } catch {
+      if (orig) {
+        setAppts(prev => [...prev, orig]);
+        setSelectedAppt(orig);
+      }
+    }
+  };
+
+  const handleNoShow = async (apptId: string) => {
+    const orig = apptsRef.current.find(a => a.id === apptId);
+    setAppts(prev => prev.map(a => a.id === apptId ? { ...a, status: 'noShow' } : a));
+    setSelectedAppt(prev => prev?.id === apptId ? { ...prev, status: 'noShow' } : prev);
+    try {
+      const res = await fetch(`${API}/api/v1/bookings/${apptId}/status`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'noShow' }),
+      });
+      if (!res.ok) throw new Error('no-show failed');
+    } catch {
+      if (orig) {
+        setAppts(prev => prev.map(a => a.id === apptId ? orig : a));
+        setSelectedAppt(prev => prev?.id === apptId ? orig : prev);
+      }
+    }
+  };
+
+  const handlePOSConfirm = async (appt: Appointment, result: { method: string; discount: number; total: number }) => {
+    const apptId = appt.id;
+    const orig = apptsRef.current.find(a => a.id === apptId);
+    setAppts(prev => prev.map(a => a.id === apptId ? { ...a, status: 'completed' } : a));
+    setPosAppt(null);
+    setSelectedAppt(null);
+    try {
+      const res = await fetch(`${API}/api/v1/bookings/${apptId}/checkout`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          method:        result.method,
+          discountPaisa: result.discount,
+          totalPaisa:    result.total,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        const msg = errJson?.error?.message ?? 'Checkout failed. Please try again.';
+        throw new Error(msg);
+      }
+      // Cache payment locally so the panel shows it immediately without a refetch
+      setPaymentByAppt(prev => ({
+        ...prev,
+        [apptId]: {
+          gateway:       result.method,
+          amountPaisa:   result.total,
+          discountPaisa: result.discount,
+          state:         'SUCCESS',
+          paidAt:        new Date().toISOString(),
+        },
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Checkout failed. Please try again.';
+      pushToast('error', msg);
+      if (orig) {
+        setAppts(prev => prev.map(a => a.id === apptId ? orig : a));
+        setPosAppt(orig);
+      }
+    }
+  };
+
+  const handleSaveCustomerNotes = (clientId: string, notes: string, customerId?: string) => {
+    updateClientNotes(clientId, notes);
+    if (customerId) {
+      fetch(`${API}/api/v1/customers/${customerId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
+      }).catch(() => null);
+    }
+  };
+
+  const fetchCustomerVisits = useCallback(async (customerId: string) => {
+    if (customerVisits[customerId]) return; // already cached
+    try {
+      const res = await fetch(`${API}/api/v1/customers/${customerId}/bookings?limit=6`, { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data)) {
+        const visits: VisitRecord[] = json.data.map((r: { service: string; date: string; staff: string; amount: number }) => ({
+          service: r.service,
+          date:    r.date,
+          staff:   r.staff,
+          amount:  r.amount,
+        }));
+        setCustomerVisits(prev => ({ ...prev, [customerId]: visits }));
+      }
+    } catch {
+      // silently ignore — panel falls back to seed data
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerVisits]);
+
+  const fetchPayment = useCallback(async (apptId: string) => {
+    if (paymentByAppt[apptId]) return;
+    try {
+      const res = await fetch(`${API}/api/v1/bookings/${apptId}/payment`, { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.ok && json.data) {
+        setPaymentByAppt(prev => ({ ...prev, [apptId]: json.data as PaymentInfo }));
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentByAppt]);
+
   const handleMove = async (apptId: string, newStart: number, newEnd: number) => {
     // Snapshot original times for rollback
     const orig = apptsRef.current.find(a => a.id === apptId);
@@ -317,6 +472,8 @@ export default function DashboardPage() {
                 setSelectedAppt(a);
                 setPosAppt(null);
                 if (isMobile) setSheetOpen(true);
+                if (a.customerId) fetchCustomerVisits(a.customerId);
+                if (a.status === 'completed') fetchPayment(a.id);
               }}
               onMove={handleMove}
               activeStaffId={activeStaffId}
@@ -338,10 +495,7 @@ export default function DashboardPage() {
               <POSPanel
                 appt={posAppt}
                 onBack={() => setPosAppt(null)}
-                onConfirm={() => {
-                  setAppts(prev => prev.map(a => a.id === posAppt.id ? { ...a, status: 'completed' } : a));
-                  setPosAppt(null);
-                }}
+                onConfirm={(result) => handlePOSConfirm(posAppt, result)}
               />
             ) : (
               <div style={{
@@ -366,14 +520,17 @@ export default function DashboardPage() {
                 <AppointmentPanel
                   appt={selectedAppt}
                   client={clients.find(c => c.name === selectedAppt.client) ?? null}
+                  visits={selectedAppt.customerId ? customerVisits[selectedAppt.customerId] : undefined}
+                  payment={paymentByAppt[selectedAppt.id]}
                   onClose={() => setSelectedAppt(null)}
                   onCheckout={() => setPosAppt(selectedAppt)}
+                  onCheckIn={() => handleCheckIn(selectedAppt.id)}
                   onReschedule={() => { /* Phase 5 */ }}
-                  onCancel={() => {
-                    setAppts(prev => prev.filter(a => a.id !== selectedAppt.id));
-                    setSelectedAppt(null);
-                  }}
-                  onUpdateNotes={updateClientNotes}
+                  onCancel={() => handleCancel(selectedAppt.id)}
+                  onNoShow={() => handleNoShow(selectedAppt.id)}
+                  onUpdateNotes={(clientId, notes) =>
+                    handleSaveCustomerNotes(clientId, notes, selectedAppt.customerId)
+                  }
                 />
               )}
               {!posAppt && !selectedAppt && <AppointmentPanelEmpty />}
@@ -381,11 +538,7 @@ export default function DashboardPage() {
                 <POSPanel
                   appt={posAppt}
                   onBack={() => setPosAppt(null)}
-                  onConfirm={() => {
-                    setAppts(prev => prev.map(a => a.id === posAppt.id ? { ...a, status: 'completed' } : a));
-                    setPosAppt(null);
-                    setSelectedAppt(null);
-                  }}
+                  onConfirm={(result) => handlePOSConfirm(posAppt, result)}
                 />
               )}
             </div>
@@ -411,6 +564,8 @@ export default function DashboardPage() {
         }}
       />
 
+      <ToastStack toasts={toasts} onDismiss={dismissToast} />
+
       {/* Mobile appointment bottom sheet */}
       <BottomSheet
         open={sheetOpen && isMobile}
@@ -420,19 +575,21 @@ export default function DashboardPage() {
           <AppointmentPanel
             appt={selectedAppt}
             client={clients.find(c => c.name === selectedAppt.client) ?? null}
+            visits={selectedAppt.customerId ? customerVisits[selectedAppt.customerId] : undefined}
+            payment={paymentByAppt[selectedAppt.id]}
             onClose={() => { setSheetOpen(false); setSelectedAppt(null); }}
             onCheckout={() => {
               setSheetOpen(false);
               setPosAppt(selectedAppt);
               setNav('pos');
             }}
+            onCheckIn={() => { handleCheckIn(selectedAppt.id); setSheetOpen(false); }}
             onReschedule={() => {}}
-            onCancel={() => {
-              setAppts(prev => prev.filter(a => a.id !== selectedAppt.id));
-              setSheetOpen(false);
-              setSelectedAppt(null);
-            }}
-            onUpdateNotes={updateClientNotes}
+            onCancel={() => { handleCancel(selectedAppt.id); setSheetOpen(false); }}
+            onNoShow={() => { handleNoShow(selectedAppt.id); setSheetOpen(false); }}
+            onUpdateNotes={(clientId, notes) =>
+              handleSaveCustomerNotes(clientId, notes, selectedAppt.customerId)
+            }
           />
         )}
       </BottomSheet>

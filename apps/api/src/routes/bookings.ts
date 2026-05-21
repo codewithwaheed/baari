@@ -9,6 +9,7 @@
 //   NO_SHOW       → noShow
 //   INITIATED / CANCELLED / EXPIRED → treated as confirmed for display
 
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
@@ -51,7 +52,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   NO_SHOW:         [],
   CANCELLED:       [],
   EXPIRED:         [],
-  INITIATED:       ['PAYMENT_PENDING', 'CONFIRMED', 'CANCELLED'],
+  INITIATED:       ['PAYMENT_PENDING', 'CONFIRMED', 'CHECKED_IN', 'NO_SHOW', 'CANCELLED'],
 };
 
 // ─── Input schemas ────────────────────────────────────────────────────────────
@@ -93,19 +94,21 @@ export default async function bookingRoutes(app: FastifyInstance) {
     const rows = await withTenant(jwt.tid, async (tx) =>
       tx
         .select({
-          id:          schema.bookings.id,
-          staffId:     schema.bookings.staffId,
-          staffName:   schema.staff.name,
-          staffRole:   schema.staff.role,
-          clientName:  schema.customers.name,
-          clientPhone: schema.customers.phoneE164,
-          serviceName: schema.services.name,
-          startTime:   schema.bookings.startTime,
-          endTime:     schema.bookings.endTime,
-          state:       schema.bookings.state,
-          pricePaisa:  schema.bookings.pricePaisa,
-          source:      schema.bookings.source,
-          notes:       schema.bookings.notes,
+          id:                schema.bookings.id,
+          staffId:           schema.bookings.staffId,
+          customerId:        schema.bookings.customerId,
+          staffName:         schema.staff.name,
+          staffRole:         schema.staff.role,
+          clientName:        schema.customers.name,
+          clientPhone:       schema.customers.phoneE164,
+          customerNotes:     schema.customers.notes,
+          customerCreatedAt: schema.customers.createdAt,
+          serviceName:       schema.services.name,
+          startTime:         schema.bookings.startTime,
+          endTime:           schema.bookings.endTime,
+          state:             schema.bookings.state,
+          pricePaisa:        schema.bookings.pricePaisa,
+          source:            schema.bookings.source,
         })
         .from(schema.bookings)
         .innerJoin(schema.staff,     eq(schema.bookings.staffId,    schema.staff.id))
@@ -129,19 +132,21 @@ export default async function bookingRoutes(app: FastifyInstance) {
       const endHour   = (endMs   - midnightMs) / 3_600_000;
 
       return {
-        id:          r.id,
-        staffId:     r.staffId,
-        staffName:   r.staffName,
-        staffRole:   r.staffRole,
-        clientName:  r.clientName ?? 'Unknown',
-        clientPhone: r.clientPhone,
-        serviceName: r.serviceName,
+        id:                r.id,
+        staffId:           r.staffId,
+        customerId:        r.customerId,
+        staffName:         r.staffName,
+        staffRole:         r.staffRole,
+        clientName:        r.clientName ?? 'Unknown',
+        clientPhone:       r.clientPhone,
+        notes:             r.customerNotes,        // customer-level notes, persists across bookings
+        customerCreatedAt: r.customerCreatedAt.toISOString(),
+        serviceName:       r.serviceName,
         startHour,
         endHour,
-        status:      toFrontendStatus(r.state),
-        pricePkr:    r.pricePaisa / 100,
-        source:      r.source as 'manual' | 'whatsapp' | 'web',
-        notes:       r.notes,
+        status:            toFrontendStatus(r.state),
+        pricePkr:          r.pricePaisa / 100,
+        source:            r.source as 'manual' | 'whatsapp' | 'web',
       };
     });
 
@@ -270,6 +275,109 @@ export default async function bookingRoutes(app: FastifyInstance) {
     }
 
     return reply.send({ ok: true, data: { id: updated.id } });
+  });
+
+  // ── POST /bookings/:id/checkout ───────────────────────────────────────────
+  // Records a manual payment and transitions the booking CHECKED_IN → COMPLETED.
+  const CheckoutSchema = z.object({
+    method:        z.enum(['cash', 'jazzcash', 'easypaisa', 'raast', 'card']),
+    discountPaisa: z.number().int().min(0),
+    totalPaisa:    z.number().int().positive(),
+  });
+
+  app.post('/:id/checkout', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+    const { id } = request.params as { id: string };
+
+    const parsed = CheckoutSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ ok: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.message } });
+    }
+
+    const { method, totalPaisa } = parsed.data;
+
+    const [current] = await withTenant(jwt.tid, async (tx) =>
+      tx.select({ state: schema.bookings.state })
+        .from(schema.bookings)
+        .where(and(
+          eq(schema.bookings.id, id),
+          eq(schema.bookings.tenantId, jwt.tid),
+        ))
+    );
+
+    if (!current) {
+      return reply.code(404).send({ ok: false, error: { code: 'NOT_FOUND', message: 'Booking not found' } });
+    }
+
+    const checkoutableStates = ['INITIATED', 'CONFIRMED', 'CHECKED_IN'];
+    if (!checkoutableStates.includes(current.state)) {
+      return reply.code(422).send({
+        ok: false,
+        error: { code: 'INVALID_STATE', message: `Cannot checkout a booking in state ${current.state}` },
+      });
+    }
+
+    const txnRef = `manual_${randomUUID()}`;
+
+    const [updated] = await withTenant(jwt.tid, async (tx) => {
+      await tx.insert(schema.payments).values({
+        bookingId:   id,
+        tenantId:    jwt.tid,
+        gateway:     method,
+        txnRef,
+        amountPaisa: totalPaisa,
+        state:       'SUCCESS',
+      });
+      return tx.update(schema.bookings)
+        .set({ state: 'COMPLETED', updatedAt: new Date() })
+        .where(and(
+          eq(schema.bookings.id, id),
+          eq(schema.bookings.tenantId, jwt.tid),
+        ))
+        .returning();
+    });
+
+    return reply.send({ ok: true, data: { ...updated!, status: 'completed' } });
+  });
+
+  // ── GET /bookings/:id/payment ─────────────────────────────────────────────
+  // Returns the most recent successful payment for a booking (for the completed panel).
+  app.get('/:id/payment', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+    const { id } = request.params as { id: string };
+
+    const [row] = await withTenant(jwt.tid, async (tx) =>
+      tx.select({
+        gateway:     schema.payments.gateway,
+        amountPaisa: schema.payments.amountPaisa,
+        state:       schema.payments.state,
+        paidAt:      schema.payments.createdAt,
+        bookingPrice: schema.bookings.pricePaisa,
+      })
+        .from(schema.payments)
+        .innerJoin(schema.bookings, eq(schema.payments.bookingId, schema.bookings.id))
+        .where(and(
+          eq(schema.payments.bookingId, id),
+          eq(schema.payments.tenantId, jwt.tid),
+        ))
+        .orderBy(schema.payments.createdAt)
+        .limit(1)
+    );
+
+    if (!row) {
+      return reply.code(404).send({ ok: false, error: { code: 'NOT_FOUND', message: 'No payment found' } });
+    }
+
+    return reply.send({
+      ok: true,
+      data: {
+        gateway:      row.gateway,
+        amountPaisa:  row.amountPaisa,
+        discountPaisa: row.bookingPrice - row.amountPaisa,
+        state:        row.state,
+        paidAt:       row.paidAt.toISOString(),
+      },
+    });
   });
 
   // ── PATCH /bookings/:id/notes ──────────────────────────────────────────────

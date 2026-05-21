@@ -110,6 +110,56 @@ async function applyMigration(
     console.log('✓ Migration 0002 applied.');
   }
 
+  // ── Apply 0003_working_hours_breaks ─────────────────────────────────────────
+  const { rows: rows3 } = await client.query<{ exists: string | null }>(`
+    SELECT column_name FROM information_schema.columns
+    WHERE table_name='working_hours' AND column_name='breaks' LIMIT 1
+  `);
+  if (rows3[0]?.exists) {
+    console.log('✓ Migration 0003_working_hours_breaks already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0003_working_hours_breaks.sql...');
+    const sql3 = readFileSync(join(__dirname, 'migrations/0003_working_hours_breaks.sql'), 'utf-8');
+    await client.query(sql3);
+    console.log('✓ Migration 0003 applied.');
+  }
+
+  // ── Apply 0004_checked_in_state ──────────────────────────────────────────────
+  // Idempotency: check if the correct constraint bookings_state_chk exists with CHECKED_IN.
+  // We check for the constraint by name; 0004 creates it.
+  const { rows: rows4 } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.table_constraints
+      WHERE constraint_name='bookings_state_chk' AND table_name='bookings'
+    ) AS exists
+  `);
+  if (rows4[0]?.exists) {
+    console.log('✓ Migration 0004_checked_in_state already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0004_checked_in_state.sql...');
+    const sql4 = readFileSync(join(__dirname, 'migrations/0004_checked_in_state.sql'), 'utf-8');
+    await client.query(sql4);
+    console.log('✓ Migration 0004 applied.');
+  }
+
+  // ── Apply 0005_fix_state_constraint ─────────────────────────────────────────
+  // Idempotency: check if the phantom "bookings_state_check" constraint still exists.
+  // If it does, the fix hasn't been applied yet.
+  const { rows: rows5 } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.table_constraints
+      WHERE constraint_name='bookings_state_check' AND table_name='bookings'
+    ) AS exists
+  `);
+  if (!rows5[0]?.exists) {
+    console.log('✓ Migration 0005_fix_state_constraint already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0005_fix_state_constraint.sql...');
+    const sql5 = readFileSync(join(__dirname, 'migrations/0005_fix_state_constraint.sql'), 'utf-8');
+    await client.query(sql5);
+    console.log('✓ Migration 0005 applied — bookings state constraint fixed.');
+  }
+
   // ── RLS patches (idempotent) ─────────────────────────────────────────────────
   // Applied on every run to ensure RLS is correct even if 0002_auth.sql ran before
   // these policies were added.
