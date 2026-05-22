@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 const API = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001';
 
@@ -18,8 +19,8 @@ import { BottomSheet } from '@/components/dashboard/BottomSheet';
 import { ToastStack, useToasts } from '@/components/dashboard/Toast';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
-  SEED_APPTS, SEED_REQUESTS, SEED_CLIENTS, STAFF as SEED_STAFF,
-  type NavId, type Appointment, type Staff, type Client, type VisitRecord,
+  SEED_APPTS, SEED_REQUESTS, STAFF as SEED_STAFF,
+  type NavId, type Appointment, type Staff, type VisitRecord,
 } from '@/components/dashboard/data';
 
 // ── Staff colour palette ──────────────────────────────────────────────────────
@@ -134,14 +135,23 @@ const VIEW_TITLES: Record<NavId, string> = {
 
 const LOCKED_VIEWS: NavId[] = ['waitlist', 'messages', 'inventory', 'marketing', 'reports', 'billie'];
 
+const VALID_TABS: NavId[] = ['calendar', 'requests', 'clients', 'pos', 'settings', 'waitlist', 'messages', 'inventory', 'marketing', 'reports', 'billie'];
+
 export default function DashboardPage() {
-  const [nav, setNav]               = useState<NavId>('calendar');
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
+  const initialTab = (() => {
+    const t = searchParams.get('tab') as NavId | null;
+    return t && VALID_TABS.includes(t) ? t : 'calendar';
+  })();
+
+  const [nav, setNav]               = useState<NavId>(initialTab);
   const [date, setDate]             = useState(() => new Date());
   const [appts, setAppts]           = useState<Appointment[]>([]);
   const [staff, setStaff]           = useState<Staff[]>(SEED_STAFF);
   const [loadingAppts, setLoadingAppts] = useState(false);
   const [requests, setRequests]     = useState(SEED_REQUESTS);
-  const [clients, setClients]       = useState<Client[]>(SEED_CLIENTS);
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [posAppt, setPosAppt]       = useState<Appointment | null>(null);
   const [modalOpen, setModalOpen]   = useState(false);
@@ -243,16 +253,21 @@ export default function DashboardPage() {
     setNav(id);
     setSelectedAppt(null);
     setPosAppt(null);
+    // Sync URL so refresh restores the active tab
+    const params = new URLSearchParams(searchParams.toString());
+    if (id === 'calendar') {
+      params.delete('tab');
+    } else {
+      params.set('tab', id);
+    }
+    const qs = params.toString();
+    router.replace(`/dashboard${qs ? '?' + qs : ''}`, { scroll: false });
   };
 
   const handleLogout = useCallback(async () => {
     await fetch(`${API}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => null);
     window.location.href = '/login';
   }, []);
-
-  const updateClientNotes = (id: string, notes: string) => {
-    setClients(prev => prev.map(c => c.id === id ? { ...c, notes } : c));
-  };
 
   const handleCheckIn = async (apptId: string) => {
     const orig = apptsRef.current.find(a => a.id === apptId);
@@ -353,8 +368,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSaveCustomerNotes = (clientId: string, notes: string, customerId?: string) => {
-    updateClientNotes(clientId, notes);
+  const handleSaveCustomerNotes = (_clientId: string, notes: string, customerId?: string) => {
     if (customerId) {
       fetch(`${API}/api/v1/customers/${customerId}`, {
         method: 'PATCH', credentials: 'include',
@@ -490,7 +504,7 @@ export default function DashboardPage() {
             />
           )}
           {nav === 'clients' && (
-            <ClientsView clients={clients} onUpdateNotes={updateClientNotes} />
+            <ClientsView />
           )}
           {isPOS && (
             posAppt ? (
@@ -521,7 +535,7 @@ export default function DashboardPage() {
               {!posAppt && selectedAppt && (
                 <AppointmentPanel
                   appt={selectedAppt}
-                  client={clients.find(c => c.name === selectedAppt.client) ?? null}
+                  client={null}
                   visits={selectedAppt.customerId ? customerVisits[selectedAppt.customerId] : undefined}
                   payment={paymentByAppt[selectedAppt.id]}
                   onClose={() => setSelectedAppt(null)}
@@ -576,7 +590,7 @@ export default function DashboardPage() {
         {selectedAppt && (
           <AppointmentPanel
             appt={selectedAppt}
-            client={clients.find(c => c.name === selectedAppt.client) ?? null}
+            client={null}
             visits={selectedAppt.customerId ? customerVisits[selectedAppt.customerId] : undefined}
             payment={paymentByAppt[selectedAppt.id]}
             onClose={() => { setSheetOpen(false); setSelectedAppt(null); }}

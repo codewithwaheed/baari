@@ -2,29 +2,18 @@
 // Customer routes — tenant-scoped via JWT tid claim.
 
 import type { FastifyInstance } from 'fastify';
-import { eq, and, or, ilike, desc } from 'drizzle-orm';
+import { eq, and, or, ilike, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { withTenant, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
 
 // ─── Phone normalisation ──────────────────────────────────────────────────────
-// Accepts: 03001234567 | 0300 1234 567 | +923001234567 | 923001234567
-// Returns: +923001234567 (E.164) or the cleaned string if unrecognised.
 
 export function normalizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
-  // 03XXXXXXXXX (11 digits, Pakistani local) → +923XXXXXXXXX
-  if (digits.startsWith('03') && digits.length === 11) {
-    return '+92' + digits.slice(1);
-  }
-  // 923XXXXXXXXX (12 digits, without +) → +923XXXXXXXXX
-  if (digits.startsWith('92') && digits.length === 12) {
-    return '+' + digits;
-  }
-  // Already E.164 — strip spaces only
-  if (raw.trimStart().startsWith('+')) {
-    return '+' + digits;
-  }
+  if (digits.startsWith('03') && digits.length === 11) return '+92' + digits.slice(1);
+  if (digits.startsWith('92') && digits.length === 12) return '+' + digits;
+  if (raw.trimStart().startsWith('+')) return '+' + digits;
   return raw.trim();
 }
 
@@ -46,12 +35,18 @@ const UpdateCustomerSchema = z.object({
 export default async function customerRoutes(app: FastifyInstance) {
   app.addHook('onRequest', (app as any).authenticate);
 
-  // ── GET /customers?phone=<phone> ──────────────────────────────────────────
-  // Look up a customer by phone number (exact match on E.164 after normalisation).
+  // ── GET /customers?phone=&q=&limit=&offset= ───────────────────────────────
+  // phone: exact lookup (for booking modal auto-fill)
+  // q:     full-text search by name or phone
+  // no q:  list all, sorted by lastVisitDate DESC NULLS LAST
+  // Always paginated via limit + offset.
   app.get('/', async (request, reply) => {
     const jwt = request.user as JWTPayload;
-    const { phone, q } = request.query as { phone?: string; q?: string };
+    const { phone, q, limit: limitStr, offset: offsetStr } = request.query as {
+      phone?: string; q?: string; limit?: string; offset?: string;
+    };
 
+    // Exact phone lookup (used by booking modal)
     if (phone) {
       const e164 = normalizePhone(phone);
       const [customer] = await withTenant(jwt.tid, async (tx) =>
@@ -77,35 +72,116 @@ export default async function customerRoutes(app: FastifyInstance) {
       return reply.send({ ok: true, data: customer });
     }
 
-    // Full-text search (for Clients view — Phase 7)
-    if (q && q.trim().length > 0) {
-      const term = `%${q.trim()}%`;
-      const rows = await withTenant(jwt.tid, async (tx) =>
-        tx.select({
-          id:        schema.customers.id,
-          name:      schema.customers.name,
-          phoneE164: schema.customers.phoneE164,
-          isVip:     schema.customers.isVip,
-          waOptIn:   schema.customers.waOptIn,
+    // List / search — with visit stats and pagination
+    const limit  = Math.min(Math.max(parseInt(limitStr  ?? '20', 10) || 20, 1), 50);
+    const offset = Math.max(parseInt(offsetStr ?? '0',  10) || 0, 0);
+
+    const rows = await withTenant(jwt.tid, async (tx) => {
+      // Subquery: aggregate visit stats per customer
+      const vs = tx
+        .select({
+          customerId:    schema.bookings.customerId,
+          lastVisitDate: sql<string | null>`MAX(${schema.bookings.startTime})`.as('last_visit_date'),
+          visitCount:    sql<number>`COUNT(*)::int`.as('visit_count'),
         })
-          .from(schema.customers)
-          .where(and(
-            eq(schema.customers.tenantId, jwt.tid),
-            or(
-              ilike(schema.customers.name, term),
-              ilike(schema.customers.phoneE164, term),
-            ),
-          ))
-          .limit(20)
-      );
-      return reply.send({ ok: true, data: rows });
+        .from(schema.bookings)
+        .where(and(
+          eq(schema.bookings.tenantId, jwt.tid),
+          eq(schema.bookings.state, 'COMPLETED'),
+        ))
+        .groupBy(schema.bookings.customerId)
+        .as('vs');
+
+      const searchCond = q && q.trim().length > 0
+        ? or(
+            ilike(schema.customers.name, `%${q.trim()}%`),
+            ilike(schema.customers.phoneE164, `%${q.trim()}%`),
+          )
+        : undefined;
+
+      return tx
+        .select({
+          id:            schema.customers.id,
+          name:          schema.customers.name,
+          phoneE164:     schema.customers.phoneE164,
+          isVip:         schema.customers.isVip,
+          waOptIn:       schema.customers.waOptIn,
+          lastVisitDate: vs.lastVisitDate,
+          visitCount:    sql<number>`COALESCE(${vs.visitCount}, 0)::int`,
+        })
+        .from(schema.customers)
+        .leftJoin(vs, eq(schema.customers.id, vs.customerId))
+        .where(and(
+          eq(schema.customers.tenantId, jwt.tid),
+          ...(searchCond ? [searchCond] : []),
+        ))
+        .orderBy(
+          sql`${vs.lastVisitDate} DESC NULLS LAST`,
+          desc(schema.customers.createdAt),
+        )
+        .limit(limit + 1)  // +1 to determine hasMore
+        .offset(offset);
+    });
+
+    const hasMore = rows.length > limit;
+    const data    = hasMore ? rows.slice(0, limit) : rows;
+
+    return reply.send({ ok: true, data, hasMore, offset, limit });
+  });
+
+  // ── GET /customers/:id ────────────────────────────────────────────────────
+  // Full profile with lifetime spend total.
+  app.get('/:id', async (request, reply) => {
+    const jwt = request.user as JWTPayload;
+    const { id } = request.params as { id: string };
+
+    const [customer] = await withTenant(jwt.tid, async (tx) =>
+      tx.select({
+        id:        schema.customers.id,
+        name:      schema.customers.name,
+        phoneE164: schema.customers.phoneE164,
+        waOptIn:   schema.customers.waOptIn,
+        isVip:     schema.customers.isVip,
+        notes:     schema.customers.notes,
+        createdAt: schema.customers.createdAt,
+      })
+        .from(schema.customers)
+        .where(and(
+          eq(schema.customers.id, id),
+          eq(schema.customers.tenantId, jwt.tid),
+        ))
+        .limit(1)
+    );
+
+    if (!customer) {
+      return reply.code(404).send({ ok: false, error: { code: 'NOT_FOUND', message: 'Customer not found' } });
     }
 
-    return reply.code(400).send({ ok: false, error: { code: 'MISSING_PARAM', message: 'Provide phone or q' } });
+    // Lifetime spend + visit count (completed bookings only)
+    const [stats] = await withTenant(jwt.tid, async (tx) =>
+      tx.select({
+        lifetimeSpend: sql<number>`COALESCE(SUM(${schema.bookings.pricePaisa}), 0)::bigint`,
+        visitCount:    sql<number>`COUNT(*)::int`,
+      })
+        .from(schema.bookings)
+        .where(and(
+          eq(schema.bookings.customerId, id),
+          eq(schema.bookings.tenantId, jwt.tid),
+          eq(schema.bookings.state, 'COMPLETED'),
+        ))
+    );
+
+    return reply.send({
+      ok: true,
+      data: {
+        ...customer,
+        lifetimeSpend: stats?.lifetimeSpend ?? 0,
+        visitCount:    stats?.visitCount    ?? 0,
+      },
+    });
   });
 
   // ── POST /customers ────────────────────────────────────────────────────────
-  // Find-or-create a customer by phone. Idempotent — safe to call on every booking.
   app.post('/', async (request, reply) => {
     const jwt = request.user as JWTPayload;
 
@@ -116,7 +192,6 @@ export default async function customerRoutes(app: FastifyInstance) {
 
     const e164 = normalizePhone(parsed.data.phone);
 
-    // Try to find existing
     const [existing] = await withTenant(jwt.tid, async (tx) =>
       tx.select()
         .from(schema.customers)
@@ -128,7 +203,6 @@ export default async function customerRoutes(app: FastifyInstance) {
     );
 
     if (existing) {
-      // Update name if provided and different (e.g. owner corrected it)
       if (parsed.data.name && existing.name !== parsed.data.name) {
         const [updated] = await withTenant(jwt.tid, async (tx) =>
           tx.update(schema.customers)
@@ -141,7 +215,6 @@ export default async function customerRoutes(app: FastifyInstance) {
       return reply.send({ ok: true, data: existing, created: false });
     }
 
-    // Create new
     const [created] = await withTenant(jwt.tid, async (tx) =>
       tx.insert(schema.customers)
         .values({
@@ -156,12 +229,12 @@ export default async function customerRoutes(app: FastifyInstance) {
   });
 
   // ── GET /customers/:id/bookings ──────────────────────────────────────────
-  // Returns the last N completed bookings for a customer — used for "Recent visits" panel.
   app.get('/:id/bookings', async (request, reply) => {
     const jwt = request.user as JWTPayload;
     const { id } = request.params as { id: string };
-    const { limit: limitStr } = request.query as { limit?: string };
-    const limit = Math.min(parseInt(limitStr ?? '5', 10) || 5, 20);
+    const { limit: limitStr, offset: offsetStr } = request.query as { limit?: string; offset?: string };
+    const limit  = Math.min(parseInt(limitStr  ?? '10', 10) || 10, 20);
+    const offset = Math.max(parseInt(offsetStr ?? '0',  10) || 0, 0);
 
     const rows = await withTenant(jwt.tid, async (tx) =>
       tx.select({
@@ -179,10 +252,12 @@ export default async function customerRoutes(app: FastifyInstance) {
           eq(schema.bookings.tenantId,   jwt.tid),
         ))
         .orderBy(desc(schema.bookings.startTime))
-        .limit(limit)
+        .limit(limit + 1)
+        .offset(offset)
     );
 
-    const data = rows.map(r => ({
+    const hasMore = rows.length > limit;
+    const data = (hasMore ? rows.slice(0, limit) : rows).map(r => ({
       service: r.serviceName,
       date:    r.startTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Karachi' }),
       staff:   r.staffName,
@@ -190,7 +265,7 @@ export default async function customerRoutes(app: FastifyInstance) {
       state:   r.state,
     }));
 
-    return reply.send({ ok: true, data });
+    return reply.send({ ok: true, data, hasMore, offset, limit });
   });
 
   // ── PATCH /customers/:id ──────────────────────────────────────────────────
