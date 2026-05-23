@@ -40,6 +40,21 @@ export const tenants = pgTable('tenants', {
   waWabaId:           text('wa_waba_id'),
   waToken:            text('wa_token'),
   ntn:                text('ntn'),
+  address:            text('address'),
+  googleMapsUrl:      text('google_maps_url'),
+  instagramHandle:    text('instagram_handle'),
+  contactPhone:       text('contact_phone'),
+  advanceBookingDays: integer('advance_booking_days').notNull().default(30),
+  slotIntervalMin:    integer('slot_interval_min').notNull().default(30),
+  paymentSettings:    jsonb('payment_settings').$type<{
+    iban?: string;
+    depositPercent?: number;
+    safepayKey?: string;
+    jazzcashMerchantId?: string;
+    easypaisaStoreId?: string;
+  }>(),
+  publicHolidays:     jsonb('public_holidays').$type<string[]>().notNull().default([]),
+  logoUrl:            text('logo_url'),
   createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -68,9 +83,16 @@ export const staff = pgTable('staff', {
   locationId: uuid('location_id').references(() => locations.id),
   name:       text('name').notNull(),
   role:       text('role').notNull().default('stylist'),   // stylist | colorist | esthetician | barber | nail_tech | manager
-  avatarUrl:  text('avatar_url'),
-  isActive:   boolean('is_active').notNull().default(true),
-  createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  avatarUrl:         text('avatar_url'),
+  isActive:          boolean('is_active').notNull().default(true),
+  workSchedule:      jsonb('work_schedule').$type<Record<string, {
+    isOpen: boolean;
+    openTime: string;
+    closeTime: string;
+    breaks: Array<{ from: string; to: string }>;
+  }>>(),
+  specialisationIds: jsonb('specialisation_ids').$type<string[]>(),
+  createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   index('staff_tenant_idx').on(t.tenantId),
 ]);

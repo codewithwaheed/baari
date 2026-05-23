@@ -35,6 +35,7 @@ export default async function meRoutes(app: FastifyInstance) {
         slug:               tenant.slug,
         plan:               tenant.plan,
         city:               tenant.city,
+        logoUrl:            tenant.logoUrl ?? null,
         onboardingComplete: tenant.onboardingComplete,
         onboardingStep:     tenant.onboardingStep,
       },
