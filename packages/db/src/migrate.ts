@@ -173,6 +173,39 @@ async function applyMigration(
     console.log('✓ Migration 0006 applied.');
   }
 
+  // ── Apply 0007_phase8_settings ───────────────────────────────────────────────
+  // Idempotency: check if work_schedule column already exists on staff table.
+  const { rows: rows7 } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'staff' AND column_name = 'work_schedule'
+    ) AS exists
+  `);
+  if (rows7[0]?.exists) {
+    console.log('✓ Migration 0007_phase8_settings already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0007_phase8_settings.sql...');
+    const sql7 = readFileSync(join(__dirname, 'migrations/0007_phase8_settings.sql'), 'utf-8');
+    await client.query(sql7);
+    console.log('✓ Migration 0007 applied — Phase 8 settings columns added.');
+  }
+
+  // ── Apply 0008_logo_url ───────────────────────────────────────────────────────
+  const { rows: rows8 } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'tenants' AND column_name = 'logo_url'
+    ) AS exists
+  `);
+  if (rows8[0]?.exists) {
+    console.log('✓ Migration 0008_logo_url already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0008_logo_url.sql...');
+    const sql8 = readFileSync(join(__dirname, 'migrations/0008_logo_url.sql'), 'utf-8');
+    await client.query(sql8);
+    console.log('✓ Migration 0008 applied — logo_url column added.');
+  }
+
   // ── RLS patches (idempotent) ─────────────────────────────────────────────────
   // Applied on every run to ensure RLS is correct even if 0002_auth.sql ran before
   // these policies were added.

@@ -13,6 +13,7 @@ interface SidebarProps {
   userRole?: string;
   tenantName?: string;
   tenantCity?: string;
+  tenantLogoUrl?: string | null;
 }
 
 const MAIN_NAV: { id: NavId; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
@@ -81,6 +82,7 @@ export function Sidebar({
   userRole = 'owner',
   tenantName = 'My Salon',
   tenantCity,
+  tenantLogoUrl,
 }: SidebarProps) {
   const [logoutHover, setLogoutHover] = useState(false);
 
@@ -110,22 +112,33 @@ export function Sidebar({
         borderRadius: 6,
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        {/* Baari B monogram — placeholder until salon uploads their own logo */}
+        {/* Salon logo — falls back to initials monogram */}
         <div style={{
           width: 32, height: 32, borderRadius: 6,
           background: 'var(--baari-onyx)',
-          border: '1.5px solid rgba(232,255,71,0.35)',
+          border: tenantLogoUrl ? '1.5px solid rgba(255,255,255,0.12)' : '1.5px solid rgba(232,255,71,0.35)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, overflow: 'hidden',
         }}>
-          <span style={{
-            fontFamily: 'var(--font-display)',
-            fontStyle: 'italic', fontWeight: 700,
-            fontSize: 18, lineHeight: 1,
-            color: 'var(--baari-lime)',
-            letterSpacing: '-0.03em',
-            userSelect: 'none',
-          }}>B</span>
+          {tenantLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={tenantLogoUrl}
+              alt={tenantName}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <span style={{
+              fontFamily: 'var(--font-display)',
+              fontStyle: 'italic', fontWeight: 700,
+              fontSize: 18, lineHeight: 1,
+              color: 'var(--baari-lime)',
+              letterSpacing: '-0.03em',
+              userSelect: 'none',
+            }}>
+              {tenantName.charAt(0).toUpperCase() || 'B'}
+            </span>
+          )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

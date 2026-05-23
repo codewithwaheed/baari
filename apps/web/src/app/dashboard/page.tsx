@@ -14,7 +14,8 @@ import { POSPanel } from '@/components/dashboard/POSPanel';
 import { RequestsView } from '@/components/dashboard/RequestsView';
 import { ClientsView } from '@/components/dashboard/ClientsView';
 import { NewBookingModal } from '@/components/dashboard/NewBookingModal';
-import { ComingSoon, SettingsStub } from '@/components/dashboard/ComingSoon';
+import { ComingSoon } from '@/components/dashboard/ComingSoon';
+import { SettingsView } from '@/components/dashboard/SettingsView';
 import { BottomSheet } from '@/components/dashboard/BottomSheet';
 import { ToastStack, useToasts } from '@/components/dashboard/Toast';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -117,6 +118,7 @@ interface UserInfo {
   role: string;
   tenantName: string;
   tenantCity?: string;
+  tenantLogoUrl?: string | null;
 }
 
 const VIEW_TITLES: Record<NavId, string> = {
@@ -156,7 +158,7 @@ export default function DashboardPage() {
   const [posAppt, setPosAppt]       = useState<Appointment | null>(null);
   const [modalOpen, setModalOpen]   = useState(false);
   const [user, setUser]             = useState<UserInfo>({
-    name: '', role: 'owner', tenantName: '', tenantCity: undefined,
+    name: '', role: 'owner', tenantName: '', tenantCity: undefined, tenantLogoUrl: null,
   });
 
   const { toasts, push: pushToast, dismiss: dismissToast } = useToasts();
@@ -213,10 +215,11 @@ export default function DashboardPage() {
       .then(data => {
         if (data?.ok) {
           setUser({
-            name:       data.user.name   ?? '',
-            role:       data.user.role   ?? 'owner',
-            tenantName: data.tenant.name ?? '',
-            tenantCity: data.tenant.city ?? undefined,
+            name:          data.user.name         ?? '',
+            role:          data.user.role          ?? 'owner',
+            tenantName:    data.tenant.name        ?? '',
+            tenantCity:    data.tenant.city        ?? undefined,
+            tenantLogoUrl: data.tenant.logoUrl     ?? null,
           });
         }
       })
@@ -461,6 +464,7 @@ export default function DashboardPage() {
         userRole={user.role}
         tenantName={user.tenantName || 'My Salon'}
         tenantCity={user.tenantCity}
+        tenantLogoUrl={user.tenantLogoUrl}
       />
 
       {/* Main column */}
@@ -526,7 +530,7 @@ export default function DashboardPage() {
               </div>
             )
           )}
-          {nav === 'settings' && <SettingsStub />}
+          {nav === 'settings' && <SettingsView />}
           {LOCKED_VIEWS.includes(nav) && <ComingSoon id={nav} />}
 
           {/* Right panel — calendar only, hidden on mobile */}
