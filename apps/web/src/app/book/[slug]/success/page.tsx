@@ -1,6 +1,6 @@
 // apps/web/src/app/book/[slug]/success/page.tsx
 // Post-submission confirmation page.
-// Query params: service, staff, date, time, price, phone
+// Query params: services (JSON string[]), staff, date, time, price, phone
 // Passed from BookingFlow on successful POST /public/salon/:slug/book.
 
 import type { Metadata } from 'next';
@@ -19,12 +19,22 @@ interface Props {
 export default async function BookingSuccessPage({ params, searchParams }: Props) {
   const { slug }           = await params;
   const sp                 = await searchParams;
-  const service            = sp['service'] ?? 'Your service';
-  const staff              = sp['staff']   ?? '';
-  const date               = sp['date']    ?? '';
-  const time               = sp['time']    ?? '';
-  const price              = sp['price']   ? Number(sp['price']) : null;
-  const phone              = sp['phone']   ?? '';
+
+  // `services` is JSON-encoded string[] — parse it; fall back to legacy `service` param
+  let serviceNames: string[] = [];
+  try {
+    const raw = sp['services'];
+    if (raw) serviceNames = JSON.parse(raw) as string[];
+  } catch {
+    // fallback: legacy single-service param
+  }
+  if (serviceNames.length === 0 && sp['service']) serviceNames = [sp['service']];
+
+  const staff  = sp['staff']   ?? '';
+  const date   = sp['date']    ?? '';
+  const time   = sp['time']    ?? '';
+  const price  = sp['price']   ? Number(sp['price']) : null;
+  const phone  = sp['phone']   ?? '';
 
   const priceFmt = price !== null
     ? `PKR ${(price / 100).toLocaleString()}`
@@ -88,9 +98,30 @@ export default async function BookingSuccessPage({ params, searchParams }: Props
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--baari-stone)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>
                 Your booking
               </div>
-              <Row label="Service" value={`${service}${staff ? ` with ${staff}` : ''}`} />
+
+              {/* Service chips */}
+              {serviceNames.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                  {serviceNames.map((name, i) => (
+                    <span key={i} style={{
+                      display: 'inline-block',
+                      padding: '3px 8px',
+                      background: '#fff',
+                      border: '1px solid var(--baari-sand)',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: 'var(--baari-espresso)',
+                    }}>
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {staff && <Row label="With" value={staff} />}
               {date && time && <Row label="When" value={`${date} · ${time}`} />}
-              {priceFmt && <Row label="Price" value={priceFmt} bold />}
+              {priceFmt && <Row label="Total" value={priceFmt} bold />}
             </div>
 
             {/* Contact note */}

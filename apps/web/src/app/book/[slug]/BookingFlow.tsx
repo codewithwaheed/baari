@@ -256,10 +256,14 @@ export function BookingFlow({ slug }: { slug: string }) {
   const [noSlots, setNoSlots]         = useState(false);
 
   // Selections
-  const [selectedService, setSelectedService] = useState<PublicService | null>(null);
-  const [selectedStaff,   setSelectedStaff]   = useState<PublicStaff | null>(null);
-  const [selectedDate,    setSelectedDate]     = useState<string | null>(null); // YYYY-MM-DD
-  const [selectedSlot,    setSelectedSlot]     = useState<TimeSlot | null>(null);
+  const [selectedServices, setSelectedServices] = useState<PublicService[]>([]);
+  const [selectedStaff,    setSelectedStaff]    = useState<PublicStaff | null>(null);
+  const [selectedDate,     setSelectedDate]     = useState<string | null>(null); // YYYY-MM-DD
+  const [selectedSlot,     setSelectedSlot]     = useState<TimeSlot | null>(null);
+
+  // Derived totals from selected services
+  const totalDurationMin = selectedServices.reduce((s, sv) => s + sv.durationMin, 0);
+  const totalPricePaisa  = selectedServices.reduce((s, sv) => s + sv.pricePaisa, 0);
 
   // Customer details
   const [custName,  setCustName]  = useState('');
@@ -290,14 +294,14 @@ export function BookingFlow({ slug }: { slug: string }) {
   }, [step, slug, staffList.length]);
 
   // ── Fetch slots when date or staff changes on step 3 ─────────────────────
-  const fetchSlots = useCallback(async (date: string, staff: PublicStaff, service: PublicService) => {
+  const fetchSlots = useCallback(async (date: string, staff: PublicStaff, durationMin: number) => {
     setLoadingSlots(true);
     setSlots([]);
     setNoSlots(false);
     setSelectedSlot(null);
     try {
       const url = `${API}/api/v1/public/salon/${encodeURIComponent(slug)}/availability` +
-        `?staffId=${encodeURIComponent(staff.id)}&date=${date}&serviceDurationMin=${service.durationMin}`;
+        `?staffId=${encodeURIComponent(staff.id)}&date=${date}&serviceDurationMin=${durationMin}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('fetch failed');
       const data = await res.json();
@@ -314,22 +318,22 @@ export function BookingFlow({ slug }: { slug: string }) {
 
   function handleDateSelect(iso: string) {
     setSelectedDate(iso);
-    if (selectedStaff && selectedService) {
-      fetchSlots(iso, selectedStaff, selectedService);
+    if (selectedStaff && totalDurationMin > 0) {
+      fetchSlots(iso, selectedStaff, totalDurationMin);
     }
   }
 
   function handleStaffSwitchInStep3(s: PublicStaff) {
     setSelectedStaff(s);
     setSelectedSlot(null);
-    if (selectedDate && selectedService) {
-      fetchSlots(selectedDate, s, selectedService);
+    if (selectedDate && totalDurationMin > 0) {
+      fetchSlots(selectedDate, s, totalDurationMin);
     }
   }
 
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit() {
-    if (!selectedService || !selectedStaff || !selectedDate || !selectedSlot) return;
+    if (selectedServices.length === 0 || !selectedStaff || !selectedDate || !selectedSlot) return;
     if (!custName.trim() || !custPhone.trim()) return;
 
     setSubmitting(true);
@@ -345,7 +349,7 @@ export function BookingFlow({ slug }: { slug: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          serviceId:     selectedService.id,
+          serviceIds:    selectedServices.map(s => s.id),
           staffId:       selectedStaff.id,
           requestedAt,
           customerName:  custName.trim(),
@@ -365,12 +369,12 @@ export function BookingFlow({ slug }: { slug: string }) {
 
       // Redirect to success page, passing booking summary in search params
       const params = new URLSearchParams({
-        service: selectedService.name,
-        staff:   selectedStaff.name,
-        date:    fmtDate(selectedDate),
-        time:    selectedSlot.label,
-        price:   String(selectedService.pricePaisa),
-        phone:   custPhone.trim(),
+        services: JSON.stringify(selectedServices.map(s => s.name)),
+        staff:    selectedStaff.name,
+        date:     fmtDate(selectedDate),
+        time:     selectedSlot.label,
+        price:    String(totalPricePaisa),
+        phone:    custPhone.trim(),
       });
       router.push(`/book/${encodeURIComponent(slug)}/success?${params.toString()}`);
     } catch {
@@ -378,6 +382,15 @@ export function BookingFlow({ slug }: { slug: string }) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // ── Toggle a service in/out of selection ─────────────────────────────────
+  function handleToggleService(s: PublicService) {
+    setSelectedServices(prev =>
+      prev.some(p => p.id === s.id) ? prev.filter(p => p.id !== s.id) : [...prev, s]
+    );
+    // Reset downstream selections when service list changes
+    setSelectedSlot(null);
   }
 
   // ── Group services by category ────────────────────────────────────────────
@@ -417,18 +430,65 @@ export function BookingFlow({ slug }: { slug: string }) {
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--baari-stone)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>
                     {cat}
                   </div>
-                  <ServiceGrid services={svcs} selected={selectedService} onSelect={setSelectedService} />
+                  <ServiceGrid
+                    services={svcs}
+                    selectedIds={selectedServices.map(s => s.id)}
+                    onToggle={handleToggleService}
+                  />
                 </div>
               ))
             ) : (
-              <ServiceGrid services={services} selected={selectedService} onSelect={setSelectedService} />
+              <ServiceGrid
+                services={services}
+                selectedIds={selectedServices.map(s => s.id)}
+                onToggle={handleToggleService}
+              />
             )}
           </div>
 
-          <ActionBar
-            step={1} onBack={() => {}} onNext={() => setStep(2)}
-            nextDisabled={!selectedService}
-          />
+          {/* Sticky tally bar — shows live totals + Continue */}
+          <div style={{
+            padding: '12px 16px',
+            borderTop: '1px solid var(--baari-bone)',
+            background: '#fff',
+            position: 'sticky',
+            bottom: 0,
+          }}>
+            {selectedServices.length > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 8, fontSize: 12, color: 'var(--baari-graphite)',
+              }}>
+                <span>
+                  <strong style={{ color: 'var(--baari-onyx)' }}>{selectedServices.length}</strong>
+                  {selectedServices.length === 1 ? ' service' : ' services'}
+                  {' · '}{totalDurationMin} min
+                </span>
+                <span style={{ fontWeight: 700, color: 'var(--baari-onyx)', fontSize: 14 }}>
+                  {fmtPKR(totalPricePaisa)}
+                </span>
+              </div>
+            )}
+            <button
+              onClick={() => setStep(2)}
+              disabled={selectedServices.length === 0}
+              style={{
+                width: '100%',
+                padding: '10px 0',
+                border: 'none',
+                borderRadius: 3,
+                background: selectedServices.length === 0 ? 'var(--baari-sand)' : 'var(--baari-onyx)',
+                color: selectedServices.length === 0 ? 'var(--baari-stone)' : 'var(--baari-lime)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: selectedServices.length === 0 ? 'not-allowed' : 'pointer',
+                transition: 'background .15s',
+                letterSpacing: '.03em',
+              }}
+            >
+              {selectedServices.length === 0 ? 'Select a service to continue' : 'Continue →'}
+            </button>
+          </div>
         </>
       )}
 
@@ -440,7 +500,7 @@ export function BookingFlow({ slug }: { slug: string }) {
               Choose your barber
             </p>
             <p style={{ fontSize: 12, color: 'var(--baari-stone)', margin: '0 0 14px' }}>
-              {selectedService?.name} · {fmtPKR(selectedService?.pricePaisa ?? 0)}
+              {selectedServices.map(s => s.name).join(', ')} · {fmtPKR(totalPricePaisa)}
             </p>
 
             {staffList.length === 0 ? (
@@ -492,7 +552,7 @@ export function BookingFlow({ slug }: { slug: string }) {
       )}
 
       {/* ── Step 3: Date & Time ─────────────────────────────────────────── */}
-      {step === 3 && selectedStaff && selectedService && (
+      {step === 3 && selectedStaff && selectedServices.length > 0 && (
         <>
           <div style={{ padding: '20px 16px 8px' }}>
             {/* Staff switcher — allow changing barber without going back */}
@@ -584,7 +644,7 @@ export function BookingFlow({ slug }: { slug: string }) {
       )}
 
       {/* ── Step 4: Your details ────────────────────────────────────────── */}
-      {step === 4 && selectedService && selectedStaff && selectedDate && selectedSlot && (
+      {step === 4 && selectedServices.length > 0 && selectedStaff && selectedDate && selectedSlot && (
         <>
           <div style={{ padding: '20px 16px 8px' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--baari-stone)', textTransform: 'uppercase', letterSpacing: '.06em', margin: '0 0 14px' }}>
@@ -638,16 +698,31 @@ export function BookingFlow({ slug }: { slug: string }) {
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--baari-stone)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 8 }}>
                 Booking summary
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              {/* Service chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                {selectedServices.map(sv => (
+                  <span key={sv.id} style={{
+                    display: 'inline-block',
+                    padding: '3px 8px',
+                    background: 'var(--baari-sand)',
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: 'var(--baari-espresso)',
+                  }}>
+                    {sv.name}
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--baari-onyx)' }}>{selectedService.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--baari-graphite)', marginTop: 2 }}>with {selectedStaff.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--baari-graphite)' }}>with {selectedStaff.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--baari-graphite)', marginTop: 2 }}>
-                    {fmtDate(selectedDate)} · {selectedSlot.label} · {selectedService.durationMin} min
+                    {fmtDate(selectedDate)} · {selectedSlot.label} · {totalDurationMin} min
                   </div>
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--baari-onyx)', whiteSpace: 'nowrap', marginLeft: 12 }}>
-                  {fmtPKR(selectedService.pricePaisa)}
+                  {fmtPKR(totalPricePaisa)}
                 </div>
               </div>
             </div>
@@ -676,19 +751,19 @@ export function BookingFlow({ slug }: { slug: string }) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ServiceGrid({ services, selected, onSelect }: {
+function ServiceGrid({ services, selectedIds, onToggle }: {
   services: PublicService[];
-  selected: PublicService | null;
-  onSelect: (s: PublicService) => void;
+  selectedIds: string[];
+  onToggle: (s: PublicService) => void;
 }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
       {services.map(s => {
-        const active = selected?.id === s.id;
+        const active = selectedIds.includes(s.id);
         return (
           <button
             key={s.id}
-            onClick={() => onSelect(s)}
+            onClick={() => onToggle(s)}
             style={{
               padding: '12px', textAlign: 'left',
               border: active ? '2px solid var(--baari-onyx)' : '1px solid var(--baari-sand)',
@@ -696,9 +771,23 @@ function ServiceGrid({ services, selected, onSelect }: {
               background: active ? 'var(--baari-bone)' : '#fff',
               cursor: 'pointer',
               transition: 'border-color .1s, background .1s',
+              position: 'relative',
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--baari-onyx)', marginBottom: 3 }}>{s.name}</div>
+            {/* Checkmark badge */}
+            {active && (
+              <div style={{
+                position: 'absolute', top: 7, right: 7,
+                width: 16, height: 16, borderRadius: '50%',
+                background: 'var(--baari-onyx)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none">
+                  <polyline points="2,6 5,9 10,3" stroke="#E8FF47" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--baari-onyx)', marginBottom: 3, paddingRight: active ? 18 : 0 }}>{s.name}</div>
             <div style={{ fontSize: 11, color: 'var(--baari-stone)' }}>{s.durationMin} min</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--baari-onyx)', marginTop: 6 }}>
               {fmtPKR(s.pricePaisa)}

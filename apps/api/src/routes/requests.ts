@@ -8,7 +8,7 @@
 // Lifecycle: pending → approved (creates booking) | declined
 
 import type { FastifyInstance } from 'fastify';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { withTenant, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
 import { createBooking, SlotUnavailableError } from '../lib/bookings/create';
@@ -30,6 +30,7 @@ export default async function requestRoutes(app: FastifyInstance) {
           customerPhone:       schema.customers.phoneE164,
           serviceId:           schema.bookingRequests.serviceId,
           serviceName:         schema.services.name,
+          serviceIds:          schema.bookingRequests.serviceIds,
           staffId:             schema.bookingRequests.staffId,
           staffName:           schema.staff.name,
           requestedAt:         schema.bookingRequests.requestedAt,
@@ -49,21 +50,42 @@ export default async function requestRoutes(app: FastifyInstance) {
         .orderBy(sql`${schema.bookingRequests.createdAt} DESC`)
     );
 
-    const data = rows.map(r => ({
-      id:                  r.id,
-      customerId:          r.customerId,
-      customerName:        r.customerName ?? 'Unknown',
-      customerPhone:       r.customerPhone,
-      serviceId:           r.serviceId,
-      serviceName:         r.serviceName,
-      staffId:             r.staffId,
-      staffName:           r.staffName ?? 'Unknown',
-      requestedAt:         r.requestedAt.toISOString(),
-      requestedPricePaisa: r.requestedPricePaisa,
-      paid:                r.paid,
-      state:               r.state,
-      createdAt:           r.createdAt.toISOString(),
-    }));
+    // Resolve all service names in one query for multi-service rows
+    const allServiceIds = [...new Set(rows.flatMap(r =>
+      r.serviceIds && r.serviceIds.length > 0 ? r.serviceIds : [r.serviceId]
+    ))];
+
+    const serviceLookup = allServiceIds.length > 0
+      ? await withTenant(jwt.tid, async (tx) => {
+          const svcs = await tx
+            .select({ id: schema.services.id, name: schema.services.name, durationMin: schema.services.durationMin, pricePaisa: schema.services.pricePaisa })
+            .from(schema.services)
+            .where(inArray(schema.services.id, allServiceIds));
+          return Object.fromEntries(svcs.map(s => [s.id, s]));
+        })
+      : {} as Record<string, { id: string; name: string; durationMin: number; pricePaisa: number }>;
+
+    const data = rows.map(r => {
+      const ids = r.serviceIds && r.serviceIds.length > 0 ? r.serviceIds : [r.serviceId];
+      const services = ids
+        .map(id => serviceLookup[id])
+        .filter((s): s is NonNullable<typeof s> => s != null);
+
+      return {
+        id:                  r.id,
+        customerId:          r.customerId,
+        customerName:        r.customerName ?? 'Unknown',
+        customerPhone:       r.customerPhone,
+        staffId:             r.staffId,
+        staffName:           r.staffName ?? 'Unknown',
+        requestedAt:         r.requestedAt.toISOString(),
+        requestedPricePaisa: r.requestedPricePaisa,
+        paid:                r.paid,
+        state:               r.state,
+        createdAt:           r.createdAt.toISOString(),
+        services,
+      };
+    });
 
     return reply.send({ ok: true, data });
   });
@@ -100,13 +122,12 @@ export default async function requestRoutes(app: FastifyInstance) {
           tenantId:    schema.bookingRequests.tenantId,
           customerId:  schema.bookingRequests.customerId,
           serviceId:   schema.bookingRequests.serviceId,
+          serviceIds:  schema.bookingRequests.serviceIds,
           staffId:     schema.bookingRequests.staffId,
           requestedAt: schema.bookingRequests.requestedAt,
           state:       schema.bookingRequests.state,
-          durationMin: schema.services.durationMin,
         })
         .from(schema.bookingRequests)
-        .innerJoin(schema.services, eq(schema.bookingRequests.serviceId, schema.services.id))
         .where(and(
           eq(schema.bookingRequests.id,       id),
           eq(schema.bookingRequests.tenantId, jwt.tid),
@@ -128,10 +149,15 @@ export default async function requestRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Use stored serviceIds if present; fall back to legacy single serviceId
+      const resolvedServiceIds = req.serviceIds && req.serviceIds.length > 0
+        ? req.serviceIds
+        : [req.serviceId];
+
       const booking = await createBooking({
         tenantId:   jwt.tid,
         staffId:    req.staffId,
-        serviceIds: [req.serviceId],
+        serviceIds: resolvedServiceIds,
         customerId: req.customerId,
         startTime:  req.requestedAt,
         source:     'web',

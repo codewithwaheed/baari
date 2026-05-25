@@ -230,7 +230,7 @@ export default async function publicRoutes(app: FastifyInstance) {
     const { slug } = request.params as { slug: string };
 
     const BodySchema = z.object({
-      serviceId:     z.string().uuid(),
+      serviceIds:    z.array(z.string().uuid()).min(1, 'At least one service is required'),
       staffId:       z.string().uuid(),
       requestedAt:   z.string().datetime({ offset: true }),
       customerName:  z.string().min(1).max(100).trim(),
@@ -242,7 +242,7 @@ export default async function publicRoutes(app: FastifyInstance) {
       return reply.code(400).send({ ok: false, error: { code: 'VALIDATION_ERROR', message: parsed.error.message } });
     }
 
-    const { serviceId, staffId, requestedAt, customerName, customerPhone } = parsed.data;
+    const { serviceIds, staffId, requestedAt, customerName, customerPhone } = parsed.data;
 
     // Normalise phone to E.164
     const phoneE164 = normalisePKPhone(customerPhone);
@@ -262,20 +262,23 @@ export default async function publicRoutes(app: FastifyInstance) {
 
     const tenantId = tenant.id;
 
-    // Validate service belongs to tenant and is active
-    const [service] = await db
+    // Validate all services belong to tenant and are active
+    const serviceRows = await db
       .select({ id: schema.services.id, pricePaisa: schema.services.pricePaisa })
       .from(schema.services)
       .where(and(
-        eq(schema.services.id, serviceId),
+        inArray(schema.services.id, serviceIds),
         eq(schema.services.tenantId, tenantId),
         eq(schema.services.isActive, true),
-      ))
-      .limit(1);
+      ));
 
-    if (!service) {
-      return reply.code(404).send({ ok: false, error: { code: 'SERVICE_NOT_FOUND', message: 'Service not found or inactive' } });
+    if (serviceRows.length !== serviceIds.length) {
+      return reply.code(404).send({ ok: false, error: { code: 'SERVICE_NOT_FOUND', message: 'One or more services not found or inactive' } });
     }
+
+    // Preserve caller order; sum total price
+    const orderedServices = serviceIds.map(id => serviceRows.find(s => s.id === id)!);
+    const totalPricePaisa = orderedServices.reduce((sum, s) => sum + s.pricePaisa, 0);
 
     // Validate staff belongs to tenant and is active
     const [staffRow] = await db
@@ -314,18 +317,19 @@ export default async function publicRoutes(app: FastifyInstance) {
       customerId = created!.id;
     }
 
-    // Insert booking_request
+    // Insert booking_request — serviceId = primary (first), serviceIds = all
     const [req] = await db
       .insert(schema.bookingRequests)
       .values({
         tenantId,
         customerId,
-        serviceId,
+        serviceId:           serviceIds[0]!,
+        serviceIds,
         staffId,
-        requestedAt:          new Date(requestedAt),
-        requestedPricePaisa:  service.pricePaisa,
-        paid:                 false,
-        state:                'pending',
+        requestedAt:         new Date(requestedAt),
+        requestedPricePaisa: totalPricePaisa,
+        paid:                false,
+        state:               'pending',
       })
       .returning({ id: schema.bookingRequests.id, requestedAt: schema.bookingRequests.requestedAt });
 

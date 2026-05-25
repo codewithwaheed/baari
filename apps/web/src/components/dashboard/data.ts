@@ -44,7 +44,7 @@ export interface BookingRequest {
   id: string;
   client: string;
   phone: string;
-  service: string;
+  services: Array<{ id: string; name: string; durationMin: number; pricePaisa: number }>;
   staff: string;
   day: string;
   time: number; // decimal hours
@@ -104,11 +104,11 @@ export const SEED_APPTS: Appointment[] = [
 ];
 
 export const SEED_REQUESTS: BookingRequest[] = [
-  { id: 'r1', client: 'Ahsan Tariq',   phone: '0300 5566 778', service: 'Fade + Beard Trim',  staff: 'Usman',  day: 'Today',    time: 17.0, paid: true,  amount:  180000 },
-  { id: 'r2', client: 'Junaid Iqbal',  phone: '0321 8899 220', service: 'Facial for Men',     staff: 'Ahmed',  day: 'Tomorrow', time: 11.0, paid: false, amount:  250000 },
-  { id: 'r3', client: 'Waqas Noor',    phone: '0345 1100 234', service: 'Global Color',       staff: 'Hassan', day: 'Tomorrow', time: 14.5, paid: true,  amount:  650000 },
-  { id: 'r4', client: 'Imran Siddiq',  phone: '0333 6677 010', service: 'Hair Spa',           staff: 'Hassan', day: 'May 19',   time: 10.0, paid: false, amount:  300000 },
-  { id: 'r5', client: 'Kamran Bajwa',  phone: '0301 2233 445', service: 'Keratin Treatment',  staff: 'Usman',  day: 'May 20',   time: 16.0, paid: true,  amount:  800000 },
+  { id: 'r1', client: 'Ahsan Tariq',   phone: '0300 5566 778', services: [{ id: 's1', name: 'Fade + Beard Trim',  durationMin: 60,  pricePaisa: 180000 }], staff: 'Usman',  day: 'Today',    time: 17.0, paid: true,  amount: 180000 },
+  { id: 'r2', client: 'Junaid Iqbal',  phone: '0321 8899 220', services: [{ id: 's2', name: 'Facial for Men',     durationMin: 60,  pricePaisa: 250000 }, { id: 's3', name: 'Head Massage', durationMin: 30, pricePaisa: 120000 }], staff: 'Ahmed',  day: 'Tomorrow', time: 11.0, paid: false, amount: 370000 },
+  { id: 'r3', client: 'Waqas Noor',    phone: '0345 1100 234', services: [{ id: 's4', name: 'Global Color',       durationMin: 120, pricePaisa: 650000 }], staff: 'Hassan', day: 'Tomorrow', time: 14.5, paid: true,  amount: 650000 },
+  { id: 'r4', client: 'Imran Siddiq',  phone: '0333 6677 010', services: [{ id: 's5', name: 'Hair Spa',           durationMin: 60,  pricePaisa: 300000 }], staff: 'Hassan', day: 'May 19',   time: 10.0, paid: false, amount: 300000 },
+  { id: 'r5', client: 'Kamran Bajwa',  phone: '0301 2233 445', services: [{ id: 's6', name: 'Keratin Treatment',  durationMin: 150, pricePaisa: 800000 }, { id: 's7', name: 'Haircut', durationMin: 30, pricePaisa: 120000 }], staff: 'Usman',  day: 'May 20',   time: 16.0, paid: true,  amount: 920000 },
 ];
 
 export const SEED_CLIENTS: Client[] = [

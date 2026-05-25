@@ -45,7 +45,7 @@ interface ApiBookingRequest {
   id:                  string;
   customerName:        string;
   customerPhone:       string;
-  serviceName:         string;
+  services:            Array<{ id: string; name: string; durationMin: number; pricePaisa: number }>;
   staffName:           string;
   requestedAt:         string; // ISO UTC
   requestedPricePaisa: number;
@@ -78,15 +78,15 @@ function requestedAtToDay(iso: string): string {
 
 function toLocalRequest(r: ApiBookingRequest): BookingRequest {
   return {
-    id:      r.id,
-    client:  r.customerName,
-    phone:   r.customerPhone,
-    service: r.serviceName,
-    staff:   r.staffName,
-    day:     requestedAtToDay(r.requestedAt),
-    time:    requestedAtToHour(r.requestedAt),
-    paid:    r.paid,
-    amount:  r.requestedPricePaisa,
+    id:       r.id,
+    client:   r.customerName,
+    phone:    r.customerPhone,
+    services: r.services,
+    staff:    r.staffName,
+    day:      requestedAtToDay(r.requestedAt),
+    time:     requestedAtToHour(r.requestedAt),
+    paid:     r.paid,
+    amount:   r.requestedPricePaisa,
   };
 }
 
