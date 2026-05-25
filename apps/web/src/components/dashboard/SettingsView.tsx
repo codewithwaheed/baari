@@ -57,6 +57,7 @@ interface DayHours {
 
 interface BusinessInfo {
   name: string;
+  slug: string;
   city: string | null;
   address: string | null;
   googleMapsUrl: string | null;
@@ -2042,6 +2043,7 @@ function BusinessInfoTab({
   const logoInputRef = React.useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<BusinessInfo>({
     name: "",
+    slug: "",
     city: null,
     address: null,
     googleMapsUrl: null,
@@ -2065,8 +2067,13 @@ function BusinessInfoTab({
       .finally(() => setLoading(false));
   }, []);
 
-  function set(key: keyof BusinessInfo, value: string | null) {
+  function set(key: keyof BusinessInfo, value: string | null | number | boolean | string[]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // Sanitise slug: lowercase, spaces → hyphens, strip illegal chars
+  function sanitiseSlug(raw: string): string {
+    return raw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
   }
 
   async function handleLogoFile(file: File) {
@@ -2104,12 +2111,20 @@ function BusinessInfoTab({
       return;
     }
     setSaving(true);
+    const slugVal = sanitiseSlug(form.slug.trim());
+    if (form.slug.trim() && slugVal.length < 3) {
+      onToast("error", "Booking URL slug must be at least 3 characters");
+      setSaving(false);
+      return;
+    }
+
     const res = await fetch(`${API}/api/v1/settings/business`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name.trim(),
+        ...(form.slug.trim() && { slug: slugVal }),
         city: form.city?.trim() || null,
         address: form.address?.trim() || null,
         googleMapsUrl: form.googleMapsUrl?.trim() || null,
@@ -2120,10 +2135,18 @@ function BusinessInfoTab({
     });
     setSaving(false);
     if (res.ok) {
+      // Reflect sanitised slug back into form so preview stays accurate
+      setForm((prev) => ({ ...prev, slug: sanitiseSlug(form.slug) }));
       onToast("success", "Business info saved");
     } else {
       const j = await res.json().catch(() => null);
-      onToast("error", j?.error?.message ?? "Failed to save");
+      const code = j?.error?.code;
+      onToast(
+        "error",
+        code === "SLUG_TAKEN"
+          ? "That booking URL is already taken — please choose another"
+          : j?.error?.message ?? "Failed to save",
+      );
     }
   }
 
@@ -2275,6 +2298,39 @@ function BusinessInfoTab({
             placeholder="e.g. Waheed Barber Studio"
             style={inputStyle}
           />
+        </Field>
+
+        <Field label="Booking URL">
+          <div style={{ position: "relative" }}>
+            <span
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                fontSize: 13,
+                color: "var(--baari-stone)",
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+              }}
+            >
+              book.baari.pk/
+            </span>
+            <input
+              value={form.slug}
+              onChange={(e) => set("slug", sanitiseSlug(e.target.value))}
+              placeholder="your-salon-name"
+              style={{ ...inputStyle, paddingLeft: 112 }}
+            />
+          </div>
+          {form.slug && (
+            <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--baari-stone)" }}>
+              Customers will book at{" "}
+              <strong style={{ color: "var(--baari-espresso)" }}>
+                book.baari.pk/{form.slug}
+              </strong>
+            </p>
+          )}
         </Field>
 
         <div
