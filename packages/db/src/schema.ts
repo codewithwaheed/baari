@@ -205,6 +205,8 @@ export const bookingRequests = pgTable('booking_requests', {
   tenantId:    uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   customerId:  uuid('customer_id').notNull().references(() => customers.id),
   serviceId:   uuid('service_id').notNull().references(() => services.id),
+  // All selected service IDs (including primary). Empty array = legacy single-service row.
+  serviceIds:  text('service_ids').array().notNull().default(sql`'{}'::text[]`),
   staffId:     uuid('staff_id').references(() => staff.id),
   requestedAt: timestamp('requested_at', { withTimezone: true }).notNull(),
   requestedPricePaisa: bigint('requested_price_paisa', { mode: 'number' }).notNull(),

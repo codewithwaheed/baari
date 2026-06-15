@@ -206,6 +206,22 @@ async function applyMigration(
     console.log('✓ Migration 0008 applied — logo_url column added.');
   }
 
+  // ── Apply 0009_service_ids ────────────────────────────────────────────────────
+  const { rows: rows9 } = await client.query<{ exists: boolean }>(`
+    SELECT EXISTS(
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'booking_requests' AND column_name = 'service_ids'
+    ) AS exists
+  `);
+  if (rows9[0]?.exists) {
+    console.log('✓ Migration 0009_service_ids already applied, skipping.');
+  } else {
+    console.log('  Applying migration 0009_service_ids.sql...');
+    const sql9 = readFileSync(join(__dirname, 'migrations/0009_service_ids.sql'), 'utf-8');
+    await client.query(sql9);
+    console.log('✓ Migration 0009 applied — service_ids column added to booking_requests.');
+  }
+
   // ── RLS patches (idempotent) ─────────────────────────────────────────────────
   // Applied on every run to ensure RLS is correct even if 0002_auth.sql ran before
   // these policies were added.

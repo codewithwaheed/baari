@@ -20,8 +20,8 @@ import { BottomSheet } from '@/components/dashboard/BottomSheet';
 import { ToastStack, useToasts } from '@/components/dashboard/Toast';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
-  SEED_APPTS, SEED_REQUESTS, STAFF as SEED_STAFF,
-  type NavId, type Appointment, type Staff, type VisitRecord,
+  SEED_APPTS, STAFF as SEED_STAFF,
+  type NavId, type Appointment, type Staff, type VisitRecord, type BookingRequest,
 } from '@/components/dashboard/data';
 
 // ── Staff colour palette ──────────────────────────────────────────────────────
@@ -37,6 +37,57 @@ const STAFF_PALETTE = [
 
 function paletteColor(index: number): string {
   return STAFF_PALETTE[index % STAFF_PALETTE.length] ?? STAFF_PALETTE[0]!;
+}
+
+// ── API request type ─────────────────────────────────────────────────────────
+
+interface ApiBookingRequest {
+  id:                  string;
+  customerName:        string;
+  customerPhone:       string;
+  services:            Array<{ id: string; name: string; durationMin: number; pricePaisa: number }>;
+  staffName:           string;
+  requestedAt:         string; // ISO UTC
+  requestedPricePaisa: number;
+  paid:                boolean;
+  state:               string;
+  createdAt:           string;
+}
+
+/** Convert requestedAt UTC ISO string → decimal Karachi hour (e.g. 9.5) */
+function requestedAtToHour(iso: string): number {
+  const d = new Date(iso);
+  const karachi = d.toLocaleTimeString('en-US', { timeZone: 'Asia/Karachi', hour: '2-digit', minute: '2-digit', hour12: false });
+  const [hh, mm] = karachi.split(':').map(Number);
+  return (hh ?? 0) + (mm ?? 0) / 60;
+}
+
+/** Format requestedAt to a human-readable day label (Today / Tomorrow / May 25) */
+function requestedAtToDay(iso: string): string {
+  const d = new Date(iso);
+  const today    = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+
+  const fmt = (date: Date) => date.toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi', month: 'short', day: 'numeric' });
+  const target = fmt(d);
+  if (target === fmt(today))    return 'Today';
+  if (target === fmt(tomorrow)) return 'Tomorrow';
+  return target;
+}
+
+function toLocalRequest(r: ApiBookingRequest): BookingRequest {
+  return {
+    id:       r.id,
+    client:   r.customerName,
+    phone:    r.customerPhone,
+    services: r.services,
+    staff:    r.staffName,
+    day:      requestedAtToDay(r.requestedAt),
+    time:     requestedAtToHour(r.requestedAt),
+    paid:     r.paid,
+    amount:   r.requestedPricePaisa,
+  };
 }
 
 // ── API types (what the server returns) ──────────────────────────────────────
@@ -153,7 +204,9 @@ export default function DashboardPage() {
   const [appts, setAppts]           = useState<Appointment[]>([]);
   const [staff, setStaff]           = useState<Staff[]>(SEED_STAFF);
   const [loadingAppts, setLoadingAppts] = useState(false);
-  const [requests, setRequests]     = useState(SEED_REQUESTS);
+  const [requests, setRequests]       = useState<BookingRequest[]>([]);
+  const [requestsCount, setRequestsCount] = useState(0);
+  const [requestErrors, setRequestErrors] = useState<Record<string, string>>({});
   const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
   const [posAppt, setPosAppt]       = useState<Appointment | null>(null);
   const [modalOpen, setModalOpen]   = useState(false);
@@ -208,6 +261,72 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // ── Fetch requests ───────────────────────────────────────────────────────────
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/v1/requests`, { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data)) {
+        setRequests((json.data as ApiBookingRequest[]).map(toLocalRequest));
+      }
+    } catch { /* keep current */ }
+  }, []);
+
+  const fetchRequestsCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/v1/requests/count`, { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.ok && typeof json.data?.count === 'number') {
+        setRequestsCount(json.data.count);
+      }
+    } catch { /* keep current */ }
+  }, []);
+
+  const handleApprove = useCallback(async (r: BookingRequest) => {
+    // Optimistic remove
+    setRequests(prev => prev.filter(x => x.id !== r.id));
+    setRequestsCount(prev => Math.max(0, prev - 1));
+    setRequestErrors(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+    try {
+      const res = await fetch(`${API}/api/v1/requests/${r.id}/approve`, {
+        method: 'POST', credentials: 'include',
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        // Rollback + show error inline
+        setRequests(prev => [r, ...prev]);
+        setRequestsCount(prev => prev + 1);
+        const msg = json?.error?.code === 'SLOT_UNAVAILABLE'
+          ? 'That slot is no longer available — contact the customer to reschedule.'
+          : json?.error?.message ?? 'Approval failed. Please try again.';
+        setRequestErrors(prev => ({ ...prev, [r.id]: msg }));
+        return;
+      }
+      pushToast('success', 'Booking added to calendar');
+      fetchAppts(date, true); // refresh calendar
+    } catch {
+      setRequests(prev => [r, ...prev]);
+      setRequestsCount(prev => prev + 1);
+      setRequestErrors(prev => ({ ...prev, [r.id]: 'Network error — please try again.' }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, fetchAppts, pushToast]);
+
+  const handleDecline = useCallback(async (r: BookingRequest) => {
+    setRequests(prev => prev.filter(x => x.id !== r.id));
+    setRequestsCount(prev => Math.max(0, prev - 1));
+    setRequestErrors(prev => { const n = { ...prev }; delete n[r.id]; return n; });
+    try {
+      await fetch(`${API}/api/v1/requests/${r.id}/decline`, {
+        method: 'POST', credentials: 'include',
+      });
+    } catch {
+      // Non-critical — request is already removed from UI
+    }
+  }, []);
+
   // ── Fetch user info ──────────────────────────────────────────────────────────
   useEffect(() => {
     fetch(`${API}/api/v1/me`, { credentials: 'include' })
@@ -226,10 +345,12 @@ export default function DashboardPage() {
       .catch(() => null);
   }, []);
 
-  // ── On mount: fetch staff + today's bookings ─────────────────────────────────
+  // ── On mount: fetch staff + bookings + requests ──────────────────────────────
   useEffect(() => {
     fetchStaff();
     fetchAppts(date);
+    fetchRequests();
+    fetchRequestsCount();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -240,7 +361,16 @@ export default function DashboardPage() {
     fetchAppts(date);
   }, [date, fetchAppts]);
 
-  // ── 30s polling (silent background refresh) ──────────────────────────────────
+  // ── 60s requests poll ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchRequests();
+      fetchRequestsCount();
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [fetchRequests, fetchRequestsCount]);
+
+  // ── 30s booking poll (silent background refresh) ─────────────────────────────
   const dateRef  = useRef(date);
   dateRef.current = date;
   // Keep a live snapshot of appts for rollback inside async handleMove
@@ -459,7 +589,7 @@ export default function DashboardPage() {
         active={nav}
         onNavigate={navigate}
         onLogout={handleLogout}
-        requestsCount={requests.length}
+        requestsCount={requestsCount}
         userName={user.name || 'Owner'}
         userRole={user.role}
         tenantName={user.tenantName || 'My Salon'}
@@ -503,8 +633,9 @@ export default function DashboardPage() {
           {nav === 'requests' && (
             <RequestsView
               requests={requests}
-              onApprove={(r) => setRequests(prev => prev.filter(x => x.id !== r.id))}
-              onDecline={(r) => setRequests(prev => prev.filter(x => x.id !== r.id))}
+              requestErrors={requestErrors}
+              onApprove={handleApprove}
+              onDecline={handleDecline}
             />
           )}
           {nav === 'clients' && (
@@ -569,7 +700,7 @@ export default function DashboardPage() {
         <BottomNav
           active={nav}
           onNavigate={navigate}
-          requestsCount={requests.length}
+          requestsCount={requestsCount}
           onNew={() => setModalOpen(true)}
         />
       </div>

@@ -3,9 +3,13 @@
 
 import type { FastifyInstance } from 'fastify';
 import { eq, and, sql } from 'drizzle-orm';
-import { withTenant, schema } from '@baari/db';
+import { db, withTenant, schema } from '@baari/db';
 import type { JWTPayload } from '@baari/types';
 import { z } from 'zod';
+
+function toSlug(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
 
 // ── Default working hours (9am–8pm Mon–Sat, closed Sun) ────────────────────────
 const DEFAULT_HOURS = [0, 1, 2, 3, 4, 5, 6].map(day => ({
@@ -26,6 +30,7 @@ const HourRowSchema = z.object({
 
 const BusinessSchema = z.object({
   name:               z.string().min(1).max(200).optional(),
+  slug:               z.string().min(3).max(60).regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must be 3–60 lowercase letters, numbers, or hyphens (no leading/trailing hyphens)').optional(),
   city:               z.string().max(100).optional(),
   address:            z.string().max(500).optional(),
   googleMapsUrl:      z.string().url().nullable().optional(),
@@ -127,6 +132,7 @@ export default async function settingsRoutes(app: FastifyInstance) {
       tx
         .select({
           name:               schema.tenants.name,
+          slug:               schema.tenants.slug,
           city:               schema.tenants.city,
           address:            schema.tenants.address,
           googleMapsUrl:      schema.tenants.googleMapsUrl,
@@ -167,6 +173,22 @@ export default async function settingsRoutes(app: FastifyInstance) {
     if (body.data.advanceBookingDays !== undefined) updates['advanceBookingDays'] = body.data.advanceBookingDays;
     if (body.data.slotIntervalMin    !== undefined) updates['slotIntervalMin']    = body.data.slotIntervalMin;
     if (body.data.publicHolidays     !== undefined) updates['publicHolidays']     = body.data.publicHolidays;
+
+    // Slug — sanitise then check uniqueness across all tenants (raw db, no RLS)
+    if (body.data.slug !== undefined) {
+      const sanitised = toSlug(body.data.slug);
+      if (sanitised.length < 3) {
+        return reply.code(400).send({ ok: false, error: { code: 'SLUG_TOO_SHORT', message: 'Slug must be at least 3 characters after sanitising' } });
+      }
+      const taken = await db.query.tenants.findFirst({
+        where: and(eq(schema.tenants.slug, sanitised), sql`id != ${jwt.tid}`),
+        columns: { id: true },
+      });
+      if (taken) {
+        return reply.code(409).send({ ok: false, error: { code: 'SLUG_TAKEN', message: 'This URL is already taken — please choose another' } });
+      }
+      updates['slug'] = sanitised;
+    }
 
     if (Object.keys(updates).length === 0) {
       return reply.code(400).send({ ok: false, error: { code: 'NO_FIELDS', message: 'No fields to update' } });
